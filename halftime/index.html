@@ -5,257 +5,407 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="PropEdge">
+<meta name="apple-mobile-web-app-title" content="Halftime">
 <meta name="robots" content="noindex">
-<title>Halftime Phone Test</title>
+<title>NBA Halftime</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one narrow column of test cards, built for a phone held in one hand at halftime */
+/* Layout: one phone-width column. Controls on top, then one card per game at the half, then the rest of the slate */
 :root {
-  --bg: #f3f5f7; --card: #ffffff; --fg: #17202a; --muted: #5c6875; --line: #d9dfe5;
-  --accent: #1f5fbf; --ok: #1d7a46; --ok-bg: #e3f3ea; --bad: #b3261e; --bad-bg: #fbe7e5; --wait: #7a5b00; --wait-bg: #fbf1d4;
+  --bg: #f3f5f7; --card: #ffffff; --fg: #17202a; --muted: #5c6875; --line: #d9dfe5; --accent: #1f5fbf;
+  --hot: #b4441a; --hot-bg: #fbe9df; --cold: #1f5fbf; --cold-bg: #e2ebf8;
+  --ok: #1d7a46; --ok-bg: #e3f3ea; --warn: #7a5b00; --warn-bg: #fbf1d4; --bad: #b3261e; --bad-bg: #fbe7e5;
   --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #0f1419; --card: #182029; --fg: #e6ebf0; --muted: #93a1af; --line: #2a3540;
-  --accent: #6ea2f0; --ok: #6fd39a; --ok-bg: #173325; --bad: #f2948c; --bad-bg: #3a1c1a; --wait: #e8c766; --wait-bg: #352c12; color-scheme: dark } }
-:root[data-theme="dark"] {
-  --bg: #0f1419; --card: #182029; --fg: #e6ebf0; --muted: #93a1af; --line: #2a3540;
-  --accent: #6ea2f0; --ok: #6fd39a; --ok-bg: #173325; --bad: #f2948c; --bad-bg: #3a1c1a; --wait: #e8c766; --wait-bg: #352c12; color-scheme: dark }
-html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--bg); }
-body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.45;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
-main { max-width: 560px; margin: 0 auto 80px; display: grid; gap: 14px; }
-h1 { font-size: 1.35rem; margin: 0; text-wrap: balance; }
-.sub { color: var(--muted); margin: 4px 0 0; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
-.head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.head h2 { font-size: 1rem; margin: 0; }
-.chip { font: 600 0.72rem var(--mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: 99px; white-space: nowrap;
-  background: var(--wait-bg); color: var(--wait); }
-.chip.ok { background: var(--ok-bg); color: var(--ok); }
-.chip.bad { background: var(--bad-bg); color: var(--bad); }
-.out { font: 0.8rem/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
-button, .filebtn { font: 600 0.95rem var(--sans); background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 12px 14px; cursor: pointer; text-align: center; }
-button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
-button:focus-visible, input:focus-visible, .filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0f1419; --card: #182029; --fg: #e6ebf0; --muted: #93a1af; --line: #2a3540; --accent: #6ea2f0;
+  --hot: #f29a6b; --hot-bg: #3a2418; --cold: #7fb0f2; --cold-bg: #1a2a40;
+  --ok: #6fd39a; --ok-bg: #173325; --warn: #e8c766; --warn-bg: #352c12; --bad: #f2948c; --bad-bg: #3a1c1a; color-scheme: dark } }
+html { background: var(--bg); padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--sans);
+  padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); padding-block: 16px 90px; }
+main { max-width: 620px; margin: 0 auto; display: grid; gap: 12px; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+h1 { font-size: 1.3rem; margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 0.82rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bar > div { min-width: 0; }
+.ssname { font: 600 0.85rem var(--mono); overflow-wrap: anywhere; }
+button, .filebtn { font: 600 0.95rem var(--sans); background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 12px 14px; cursor: pointer; text-align: center; white-space: nowrap; }
+.filebtn.secondary, button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 8px 12px; }
+button:disabled { opacity: 0.6; }
+button:focus-visible, input:focus-visible, .filebtn:focus-within, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#scan { width: 100%; font-size: 1.05rem; padding: 14px; }
 input[type=file] { position: absolute; opacity: 0; width: 1px; height: 1px; }
-input[type=password] { font: 0.95rem var(--mono); padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); width: 100%; box-sizing: border-box; }
-.row { display: flex; gap: 8px; flex-wrap: wrap; }
-.row > * { flex: 1 1 140px; }
-label.lbl { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.02em; }
+input[type=password], input[type=number] { font: 0.95rem var(--mono); padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); width: 100%; box-sizing: border-box; }
+.opts { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.notice { padding: 8px 10px; border-radius: 8px; font-size: 0.85rem; background: var(--warn-bg); color: var(--warn); }
+.notice.bad { background: var(--bad-bg); color: var(--bad); }
+details summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+.settings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.settings label, .keyrow label { font-size: 0.75rem; color: var(--muted); display: grid; gap: 3px; }
+.keyrow { margin-top: 8px; }
+
+/* Game cards */
+.game h2 { font-size: 1rem; margin: 0; font-variant-numeric: tabular-nums; }
+.tag { font: 600 0.7rem var(--mono); letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 7px; border-radius: 99px; background: var(--ok-bg); color: var(--ok); white-space: nowrap; }
+.tag.late { background: var(--warn-bg); color: var(--warn); }
+.listhead { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
+.chip { font: 600 0.72rem var(--mono); letter-spacing: 0.05em; padding: 2px 8px; border-radius: 6px; }
+.chip.HOT { background: var(--hot-bg); color: var(--hot); }
+.chip.COLD { background: var(--cold-bg); color: var(--cold); }
+.chip.RAW { background: var(--warn-bg); color: var(--warn); }
+.tablewrap { overflow-x: auto; margin: 0 -4px; }
+table { border-collapse: collapse; width: 100%; font: 0.8rem/1.35 var(--mono); font-variant-numeric: tabular-nums; }
+th { font-weight: 600; color: var(--muted); font-size: 0.68rem; text-align: right; padding: 2px 4px; white-space: nowrap; }
+th:first-child { text-align: left; }
+td { padding: 3px 4px; text-align: right; white-space: nowrap; }
+td:first-child { text-align: left; }
+tr.player td { text-align: left; padding-top: 9px; font-family: var(--sans); font-size: 0.85rem; white-space: normal; }
+tr.player:first-child td { padding-top: 3px; }
+tr.player b { font-weight: 600; }
+tr.player .meta { color: var(--muted); font-size: 0.78rem; }
+tr.player .foul { color: var(--bad); font-weight: 600; }
+td.over { font-weight: 600; }
+tr.yes td { background: var(--ok-bg); }
+tr.yes td:first-child { border-radius: 6px 0 0 6px; }
+tr.yes td:last-child { border-radius: 0 6px 6px 0; }
+td.bet.ok { color: var(--ok); font-weight: 600; }
+td.bet, td.live { color: var(--muted); }
+td.live.has { color: var(--fg); }
+.skip { font-size: 0.88rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.slate { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; font: 0.85rem var(--mono); }
+.legend { font-size: 0.82rem; color: var(--muted); display: grid; gap: 6px; }
+.legend p { margin: 0; }
+footer { text-align: center; font-size: 0.8rem; }
+footer a { color: var(--accent); }
 </style>
 </head>
 <body>
-
 <main>
   <header>
-    <h1>Halftime scanner: phone test</h1>
-    <p class="sub">Checks each piece the phone app needs. Run it once; every card should turn green.</p>
+    <h1>NBA Halftime</h1>
+    <span class="muted small" id="stamp"></span>
   </header>
 
-  <section class="card" id="c-csv">
-    <div class="head"><h2>1. SaberSim CSV</h2><span class="chip" id="s-csv">Not loaded</span></div>
-    <label class="filebtn" for="csv">Load SaberSim CSV<input type="file" id="csv" accept=".csv,text/csv"></label>
-    <pre class="out" id="o-csv">Pick tonight's NBA_ file from Downloads.</pre>
-  </section>
-
   <section class="card">
-    <div class="head"><h2>2. Remembers settings</h2><span class="chip" id="s-store">Waiting</span></div>
-    <pre class="out" id="o-store"></pre>
+    <div class="bar">
+      <div>
+        <div class="muted small">SaberSim</div>
+        <div class="ssname" id="ssname">None loaded</div>
+        <div class="muted small" id="ssinfo"></div>
+      </div>
+      <label class="filebtn secondary" for="csv">Load<input type="file" id="csv" accept=".csv,text/csv" multiple></label>
+    </div>
+    <div class="notice" id="sswarn" hidden></div>
+    <button id="scan">Scan games</button>
+    <label class="opts"><input type="checkbox" id="lines" checked> Pick6 live lines (about 5 Odds API credits per close game)</label>
+    <details id="settings">
+      <summary>Settings</summary>
+      <div class="keyrow"><label for="key">Odds API key (kept on this phone only)<input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="Paste key"></label></div>
+      <div class="settings">
+        <label for="margin">Close game ≤<input type="number" id="margin" inputmode="numeric" min="0"></label>
+        <label for="hotpct">Hot ≥ % of proj<input type="number" id="hotpct" inputmode="numeric" min="0"></label>
+        <label for="coldpct">Cold ≤ % of proj<input type="number" id="coldpct" inputmode="numeric" min="0"></label>
+      </div>
+      <p class="muted small" style="margin:8px 0 0">Defaults 10 / 55 / 35, same as the Mac scanner. Tip: pick all of tonight's SaberSim files at once (Main, Night, After-Hours); the newest file wins for each player.</p>
+    </details>
   </section>
 
-  <section class="card">
-    <div class="head"><h2>3. ESPN scoreboard</h2><span class="chip" id="s-sb">Waiting</span></div>
-    <pre class="out" id="o-sb"></pre>
-  </section>
-
-  <section class="card">
-    <div class="head"><h2>4. ESPN box score</h2><span class="chip" id="s-box">Waiting</span></div>
-    <pre class="out" id="o-box"></pre>
-  </section>
-
-  <section class="card">
-    <div class="head"><h2>5. Odds API (free call, no credits)</h2><span class="chip" id="s-odds">Waiting</span></div>
-    <label class="lbl" for="key">Odds API key (kept on this phone only)</label>
-    <input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="Paste key">
-    <button id="run">Run tests</button>
-    <pre class="out" id="o-odds"></pre>
-  </section>
-
-  <div class="row">
-    <button class="secondary" id="forget">Forget key and CSV</button>
+  <div id="results" style="display:grid;gap:12px">
+    <section class="card"><p class="muted" style="margin:0">Tap <b>Scan games</b> when a game hits halftime. Games already in the 3rd quarter are scanned too and marked; the rest of tonight's slate is listed with tip times.</p></section>
   </div>
+
+  <details class="card">
+    <summary>How to read it</summary>
+    <div class="legend">
+      <p><b>Fair</b>: expected finish with a normal-rate 2nd half. HOT plays finish above it about half the time.</p>
+      <p><b>Over ≤</b>: bet the Over only if the live line is at or below this. HOT = Fair − 1 (Over hit ~68% singles / 63% combos); COLD = Fair − 2 (~63%).</p>
+      <p><b>Live</b>: Pick6's live line (one number = both sides; blank = not posted, check the app). Pick6 posts no live Rebounds or PRA, and combos are More-only.</p>
+      <p><b>Bet</b>: study hit rate for the better side at that line, halftime only. ✅ at 60%+, highlighted green.</p>
+      <p><b>Players</b> are sorted by 1H minutes ÷ projected minutes: 55–60% (best), 50–55%, 60%+, under 50%. 3+ fouls sort last.</p>
+    </div>
+  </details>
+
+  <footer class="muted"><a href="#demo" id="demolink">Demo on last night</a> · <a href="test.html">Connection test</a> · <a href="../">PropEdge Mobile</a></footer>
 </main>
 
+<script src="logic.js"></script>
 <script>
+const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
+const ODDS = 'https://api.the-odds-api.com/v4/sports/basketball_nba';
 const $ = id => document.getElementById(id);
-const ESPN = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
-const ODDS = "https://api.the-odds-api.com/v4/sports/basketball_nba/events";
+const STAT_SHORT = { 'Points': 'Pts', 'Rebounds': 'Reb', 'Assists': 'Ast', 'Threes': '3PM', 'Pts+Rebs': 'P+R',
+  'Pts+Asts': 'P+A', 'Rebs+Asts': 'R+A', 'Pts+Rebs+Asts': 'PRA' };
 
-function set(name, state, text) {
-  const chip = $("s-" + name);
-  chip.className = "chip" + (state === "ok" ? " ok" : state === "bad" ? " bad" : "");
-  chip.textContent = state === "ok" ? "Works" : state === "bad" ? "Failed" : state;
-  if (text !== undefined) $("o-" + name).textContent = text;
-}
-
+// ------------------------------------------------------------------ storage
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
-  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
 };
 
-function etDate(offsetDays = 0) {
-  const d = new Date(Date.now() + offsetDays * 86400000);
-  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-  return p.replaceAll("-", "");
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined && text !== null) e.textContent = text;
+  return e;
 }
 
-// Minimal CSV parser (quoted fields, commas and newlines inside quotes)
-function parseCSV(text) {
-  const rows = []; let row = [], f = "", q = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (q) {
-      if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
-      else f += c;
-    } else if (c === '"') q = true;
-    else if (c === ",") { row.push(f); f = ""; }
-    else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(f); rows.push(row); row = []; f = "";
-    } else f += c;
+function etToday() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+function etTime(d = new Date()) {
+  return d.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+}
+
+// ------------------------------------------------------------------ SaberSim
+let ssFiles = [];   // [{name, modified, players}]
+let ss = {};
+
+function loadSaved() {
+  try { ssFiles = JSON.parse(store.get('ht_ss_files') || '[]'); } catch (e) { ssFiles = []; }
+  if (!ssFiles.length) {   // carry over the file picked on the test page
+    const t = store.get('ht_csv_text'), n = store.get('ht_csv_name');
+    const players = t ? HT.sabersimFromCSV(t) : null;
+    if (players) ssFiles = [{ name: n || 'saved CSV', modified: 0, players }];
   }
-  if (f !== "" || row.length) { row.push(f); rows.push(row); }
-  return rows.filter(r => r.length > 1);
+  ss = HT.mergeSabersim(ssFiles);
+  showSS();
 }
 
-function checkCSV(name, text, fromMemory) {
-  const rows = parseCSV(text);
-  const hdr = rows[0] || [];
-  const iName = hdr.indexOf("Name"), iProj = hdr.indexOf("SS Proj"), iTeam = hdr.indexOf("Team"), iMin = hdr.indexOf("Min");
-  if (iName < 0 || iProj < 0) { set("csv", "bad", `${name}: no "Name" / "SS Proj" columns. Is this a SaberSim NBA export?`); return false; }
-  const players = rows.slice(1).filter(r => parseFloat(r[iProj]) > 0);
-  const teams = new Set(players.map(r => r[iTeam]));
-  const top = players.slice().sort((a, b) => parseFloat(b[iProj]) - parseFloat(a[iProj])).slice(0, 3)
-    .map(r => `  ${r[iName]} (${r[iTeam]}) ${parseFloat(r[iProj]).toFixed(1)}`).join("\n");
-  set("csv", "ok", `${fromMemory ? "Remembered from earlier: " : ""}${name}\n${players.length} projected players, ${teams.size} teams, ${hdr.length} columns` +
-    (iMin < 0 ? `\nNote: no "Min" column found` : "") + `\nTop projections:\n${top}`);
-  return true;
+function showSS() {
+  const n = Object.keys(ss).length;
+  $('ssname').textContent = ssFiles.length ? ssFiles.map(f => f.name).join(', ') : 'None loaded';
+  $('ssinfo').textContent = ssFiles.length ? `${n} players` : 'Without it, the scan uses raw 1H thresholds only';
+  const today = etToday();
+  const dated = ssFiles.filter(f => (f.name.match(/NBA_(\d{4}-\d{2}-\d{2})/) || [])[1] === today);
+  const warn = $('sswarn');
+  if (ssFiles.length && !dated.length) {
+    const d = (ssFiles[0].name.match(/NBA_(\d{4}-\d{2}-\d{2})/) || [])[1];
+    warn.textContent = d ? `This is ${d}'s SaberSim, not tonight's (${today}). Load tonight's file.` : `Can't tell this file's date. Make sure it's tonight's slate.`;
+    warn.hidden = false;
+  } else warn.hidden = true;
 }
 
-$("csv").addEventListener("change", e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const r = new FileReader();
-  r.onload = () => {
-    if (checkCSV(file.name, r.result, false)) {
-      store.set("ht_csv_name", file.name);
-      store.set("ht_csv_text", r.result);
-    }
-    testStorage();
-  };
-  r.onerror = () => set("csv", "bad", "The phone wouldn't let the page read that file.");
-  r.readAsText(file);
+$('csv').addEventListener('change', async e => {
+  const files = [...e.target.files];
+  if (!files.length) return;
+  const loaded = [], bad = [];
+  for (const f of files) {
+    const text = await f.text();
+    const players = HT.sabersimFromCSV(text);
+    if (players && Object.keys(players).length) loaded.push({ name: f.name, modified: f.lastModified / 1000, players });
+    else bad.push(f.name);
+  }
+  if (loaded.length) {
+    ssFiles = loaded;
+    ss = HT.mergeSabersim(ssFiles);
+    if (!store.set('ht_ss_files', JSON.stringify(ssFiles))) bad.push('(not saved: this browser blocks storage)');
+  }
+  showSS();
+  if (bad.length) { $('sswarn').textContent = `Skipped, not a SaberSim NBA export: ${bad.join(', ')}`; $('sswarn').hidden = false; }
+  e.target.value = '';
 });
 
-function testStorage() {
-  const stamp = String(Date.now());
-  const ok = store.set("ht_probe", stamp) && store.get("ht_probe") === stamp;
-  const csvKept = !!store.get("ht_csv_text"), keyKept = !!store.get("ht_key");
-  set("store", ok ? "ok" : "bad", ok
-    ? `Storage works.\nCSV saved: ${csvKept ? "yes" : "not yet"}   Key saved: ${keyKept ? "yes" : "not yet"}\nClose and reopen the page to confirm both survive.`
-    : "This browser blocks saved data here (Private Browsing?). You'd re-pick the CSV and key each time.");
+// ------------------------------------------------------------------ settings
+function rules() {
+  const num = (id, d) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : d; };
+  return { margin: num('margin', HT.RULES.margin), hotPct: num('hotpct', HT.RULES.hotPct), coldPct: num('coldpct', HT.RULES.coldPct) };
+}
+function initSettings() {
+  let saved = {};
+  try { saved = JSON.parse(store.get('ht_rules') || '{}'); } catch (e) {}
+  $('margin').value = saved.margin ?? HT.RULES.margin;
+  $('hotpct').value = saved.hotPct ?? HT.RULES.hotPct;
+  $('coldpct').value = saved.coldPct ?? HT.RULES.coldPct;
+  $('key').value = store.get('ht_key') || '';
+  $('lines').checked = store.get('ht_lines') !== 'off';
+  for (const id of ['margin', 'hotpct', 'coldpct']) $(id).addEventListener('change', () => store.set('ht_rules', JSON.stringify(rules())));
+  $('key').addEventListener('change', () => store.set('ht_key', $('key').value.trim()));
+  $('lines').addEventListener('change', () => store.set('ht_lines', $('lines').checked ? 'on' : 'off'));
 }
 
+// ------------------------------------------------------------------ network
 async function getJSON(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) {
+    const err = new Error(r.status === 401 ? 'Odds API key rejected' : r.status === 429 ? 'Odds API rate limit / out of credits' : `HTTP ${r.status}`);
+    err.status = r.status; throw err;
+  }
   return { data: await r.json(), headers: r.headers };
 }
 
-function gameLine(ev) {
-  const c = ev.competitions[0];
-  const side = t => `${t.team.abbreviation} ${t.score ?? ""}`.trim();
-  const away = c.competitors.find(t => t.homeAway === "away"), home = c.competitors.find(t => t.homeAway === "home");
-  return `${side(away)} @ ${side(home)}  ${ev.status.type.shortDetail}`;
+let odds;   // per scan: {events, credits, remaining, games}
+async function pick6For(g) {
+  const key = $('key').value.trim();
+  if (!odds.events) {
+    const { data } = await getJSON(`${ODDS}/events?apiKey=${encodeURIComponent(key)}`);
+    odds.events = {};
+    for (const e of data) odds.events[`${HT.TEAM_TRI[e.away_team]}@${HT.TEAM_TRI[e.home_team]}`] = e.id;
+  }
+  const eid = odds.events[`${g.away}@${g.home}`];
+  if (!eid) throw new Error('game not in the Odds API events list');
+  const q = new URLSearchParams({ apiKey: key, regions: 'us_dfs', bookmakers: 'pick6',
+    markets: Object.keys(HT.PICK6_MARKETS).join(','), oddsFormat: 'american' });
+  const { data, headers } = await getJSON(`${ODDS}/events/${eid}/odds?${q}`);
+  odds.credits += parseInt(headers.get('x-requests-last'), 10) || 0;
+  odds.remaining = headers.get('x-requests-remaining');
+  odds.games += 1;
+  return HT.pick6Lines(data);
 }
 
-async function testESPN() {
-  set("sb", "Running", "");
-  set("box", "Running", "");
-  let today;
-  try {
-    today = (await getJSON(`${ESPN}/scoreboard?dates=${etDate(0)}`)).data;
-    const evs = today.events || [];
-    set("sb", "ok", evs.length ? `${evs.length} games today:\n` + evs.map(gameLine).join("\n") : "Reached ESPN. No games on today's schedule.");
-  } catch (e) {
-    set("sb", "bad", `Couldn't reach ESPN (${e.message}). If this says "Failed to fetch", the page's host blocks outside requests.`);
-    set("box", "bad", "Skipped: scoreboard failed.");
-    return;
-  }
-  // Box score: a game that has tipped today, else last night's first final.
-  try {
-    let ev = (today.events || []).find(e => e.status.type.state !== "pre"), note = "today";
-    if (!ev) {
-      const y = (await getJSON(`${ESPN}/scoreboard?dates=${etDate(-1)}`)).data;
-      ev = (y.events || []).find(e => e.status.type.completed); note = "last night (nothing has tipped yet today)";
+// ------------------------------------------------------------------ render
+function renderList(players, kind, withLines) {
+  const frag = document.createDocumentFragment();
+  const head = el('div', 'listhead');
+  head.append(el('span', `chip ${kind}`, kind === 'RAW' ? 'RAW 1H (no SaberSim)' : kind),
+    el('span', 'muted small', kind === 'HOT' ? 'Over ≤ Fair − 1' : kind === 'COLD' ? 'cold start · Over ≤ Fair − 2' : ''));
+  frag.append(head);
+  const wrap = el('div', 'tablewrap'), table = el('table');
+  const thead = el('tr');
+  const cols = kind === 'RAW' ? ['Stat', '1H'] : ['Stat', '1H', 'Proj', 'Fair', 'Over ≤'].concat(withLines ? ['Live', 'Bet'] : []);
+  cols.forEach(c => thead.append(el('th', null, c)));
+  table.append(thead);
+  const ncol = cols.length;
+  for (const pl of players) {
+    const tr = el('tr', 'player'), td = el('td');
+    td.colSpan = ncol;
+    td.append(el('b', null, `${pl.n}. ${pl.name}`), document.createTextNode(' '));
+    const meta = [pl.team];
+    if (pl.share !== null) meta.push(`Min ${Math.round(pl.share * 100)}%`);
+    meta.push(`FG ${pl.fgm}-${pl.fga}`, pl.ssMin !== null ? `${Math.round(pl.min)}/${Math.round(pl.ssMin)} min` : `${Math.round(pl.min)} min`);
+    td.append(el('span', 'meta', meta.join(' · ')));
+    if (pl.fouls) td.append(document.createTextNode(' '), el('span', 'foul', `${pl.pf} PF ⚠️`));
+    tr.append(td); table.append(tr);
+    for (const r of pl.plays) {
+      const row = el('tr', r.ok ? 'yes' : '');
+      row.append(el('td', null, STAT_SHORT[r.stat] || r.stat), el('td', null, r.h1));
+      if (kind !== 'RAW') {
+        row.append(el('td', null, r.proj.toFixed(1)), el('td', null, r.fair.toFixed(1)), el('td', 'over', r.over.toFixed(1)));
+        if (withLines) {
+          row.append(el('td', 'live' + (r.live ? ' has' : ''), r.live || '–'));
+          row.append(el('td', 'bet' + (r.ok ? ' ok' : ''), r.rate === null ? '' : `${r.ok ? '✅ ' : ''}${r.side} ${r.rate}%`));
+        }
+      }
+      table.append(row);
     }
-    if (!ev) { set("box", "Nothing yet", "No started or finished game to test against. Try again once a game tips."); return; }
-    const s = (await getJSON(`${ESPN}/summary?event=${ev.id}`)).data;
-    const teams = (s.boxscore && s.boxscore.players) || [];
-    const lines = [];
-    let n = 0;
-    for (const t of teams) {
-      const g = t.statistics[0]; if (!g) continue;
-      const kPts = g.keys.indexOf("points"), kMin = g.keys.indexOf("minutes");
-      const best = g.athletes.filter(a => a.stats && a.stats.length).sort((a, b) => (+b.stats[kPts] || 0) - (+a.stats[kPts] || 0))[0];
-      n += g.athletes.length;
-      if (best) lines.push(`  ${t.team.abbreviation}: ${best.athlete.displayName} ${best.stats[kPts]} pts in ${best.stats[kMin]} min`);
-    }
-    set("box", n ? "ok" : "bad", n ? `Box score from ${note}:\n${gameLine(ev)}\n${n} players listed. Top scorers:\n${lines.join("\n")}` : "Reached ESPN but the box score came back empty.");
-  } catch (e) {
-    set("box", "bad", `Box score request failed (${e.message}).`);
   }
+  wrap.append(table); frag.append(wrap);
+  return frag;
 }
 
-async function testOdds() {
-  const key = $("key").value.trim();
-  if (!key) { set("odds", "Need key", "Paste your Odds API key above, then run the tests."); return; }
-  store.set("ht_key", key);
-  set("odds", "Running", "");
+function gameCard(g, box, late, demo) {
+  const card = el('section', 'card game');
+  const a = box.teamPts[g.away] || 0, h = box.teamPts[g.home] || 0;
+  const bar = el('div', 'bar');
+  bar.append(el('h2', null, `${g.away} ${a} – ${g.home} ${h}`),
+    el('span', 'tag' + (late ? ' late' : ''), demo ? 'Demo: final' : late === 'current' ? 'Q3+: current stats' : late ? '2nd half' : 'Halftime'));
+  card.append(bar);
+  if (late) card.append(el('div', 'notice', late === 'current'
+    ? '2nd half under way: these are CURRENT stats, not halftime, and lines have moved. No Bet ratings.'
+    : '2nd half under way, lines have moved. No Bet ratings.'));
+  return card;
+}
+
+// ------------------------------------------------------------------ scan
+async function scan() {
+  const btn = $('scan'), out = $('results');
+  btn.disabled = true; btn.textContent = 'Scanning…';
+  out.replaceChildren();
+  const rl = rules();
+  const demo = location.hash === '#demo';
+  const wantLines = !demo && $('lines').checked && $('key').value.trim() && Object.keys(ss).length;
+  odds = { events: null, credits: 0, remaining: null, games: 0 };
+  let today = etToday();
+  if (demo) {
+    const d = new Date(today + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - 1);
+    today = d.toISOString().slice(0, 10);
+    out.append(el('div', 'notice', `DEMO: last night's (${today}) FINAL box scores run through the scanner to show the layout. Not halftime numbers, no Pick6 lines. Open the page without #demo for the real scan.`));
+  }
+  $('stamp').textContent = `${today.slice(5).replace('-', '/')} · scanned ${etTime()} ET`;
+
+  if ($('lines').checked && !$('key').value.trim()) {
+    out.append(el('div', 'notice', 'Pick6 lines are on but no Odds API key is saved. Add it under Settings.'));
+  }
+
+  let games;
   try {
-    const { data, headers } = await getJSON(`${ODDS}?apiKey=${encodeURIComponent(key)}`);
-    const left = headers.get("x-requests-remaining"), used = headers.get("x-requests-used");
-    set("odds", "ok", `Reached The Odds API: ${data.length} NBA events listed.` +
-      (left ? `\nCredits left this month: ${left} (used ${used})` : "") + `\nThis call is free; the real scanner spends ~5 credits per game.`);
+    games = HT.gamesFromScoreboard((await getJSON(`${ESPN}/scoreboard?dates=${today.replaceAll('-', '')}`)).data);
   } catch (e) {
-    set("odds", "bad", e.message === "HTTP 401" ? "The Odds API rejected the key. Check it was pasted in full."
-      : `Couldn't reach The Odds API (${e.message}).`);
+    out.append(el('div', 'notice bad', `Couldn't load the ESPN scoreboard (${e.message}). Check the connection and scan again.`));
+    btn.disabled = false; btn.textContent = 'Scan games'; return;
   }
+
+  const toScan = demo ? games.filter(g => g.status === 3) : games.filter(g => g.status === 2 && HT.atOrPastHalf(g));
+  for (const g of toScan) {
+    let late = !demo && !g.text.toLowerCase().includes('half');
+    let box;
+    try {
+      box = HT.boxFromSummary((await getJSON(`${ESPN}/summary?event=${g.id}`)).data);
+      if (!demo && g.period >= 3) late = 'current';
+    } catch (e) {
+      out.append(el('div', 'notice bad', `${g.label}: no box score from ESPN (${e.message}). Scan again in a minute.`));
+      continue;
+    }
+    if (!box.players.length) { out.append(el('div', 'notice', `${g.label}: 1st-half box score not posted yet. Scan again in a minute.`)); continue; }
+
+    const a = box.teamPts[g.away] || 0, h = box.teamPts[g.home] || 0, margin = Math.abs(a - h);
+    if (margin > rl.margin) {
+      const c = el('section', 'card');
+      c.append(el('div', 'skip', `${g.away} ${a} – ${g.home} ${h} · margin ${margin} · skipped (blowout, starters may sit)`));
+      out.append(c); continue;
+    }
+
+    const card = gameCard(g, box, late, demo);
+    const { hot, cold, raw } = HT.evaluate(box.players, ss, rl);
+    let lines = null;
+    if (wantLines && (hot.length || cold.length)) {
+      try {
+        lines = await pick6For(g);
+        if (!Object.keys(lines).length) card.append(el('div', 'notice', 'Pick6: no live lines posted for this game.'));
+      } catch (e) {
+        card.append(el('div', 'notice bad', `Pick6 live lines unavailable (${e.message}).`));
+      }
+    }
+    const flag = !late;
+    if (!Object.keys(ss).length) {
+      if (raw.length) card.append(renderList(HT.buildList(raw, 'RAW', null, flag), 'RAW', false));
+      else card.append(el('div', 'skip', 'Close game, nothing stands out.'));
+    } else if (!hot.length && !cold.length) {
+      card.append(el('div', 'skip', 'Close game, nothing stands out.'));
+    } else {
+      if (hot.length) card.append(renderList(HT.buildList(hot, 'HOT', lines, flag), 'HOT', !!lines));
+      if (cold.length) card.append(renderList(HT.buildList(cold, 'COLD', lines, flag), 'COLD', !!lines));
+    }
+    out.append(card);
+  }
+
+  const rest = games.filter(g => !toScan.includes(g));
+  const slate = el('section', 'card');
+  if (!games.length) slate.append(el('div', 'skip', 'No NBA games today.'));
+  else {
+    if (!toScan.length) slate.append(el('div', null, 'No games at halftime right now.'));
+    if (rest.length) {
+      slate.append(el('div', 'muted small', `Other games · ${etTime()} ET`));
+      const grid = el('div', 'slate');
+      for (const g of rest) grid.append(el('span', null, g.label), el('span', 'muted', g.text));
+      slate.append(grid);
+    }
+  }
+  if (odds.games) slate.append(el('div', 'muted small', `Pick6 live lines: ${odds.games} game(s), ${odds.credits} credits used, ${odds.remaining} left this month`));
+  out.append(slate);
+
+  btn.disabled = false; btn.textContent = 'Scan again';
 }
 
-$("run").addEventListener("click", async () => {
-  testStorage();
-  await Promise.all([testESPN(), testOdds()]);
-  testStorage();
-});
-
-$("forget").addEventListener("click", () => {
-  ["ht_key", "ht_csv_text", "ht_csv_name", "ht_probe"].forEach(store.del);
-  $("key").value = "";
-  set("csv", "Not loaded", "Pick tonight's NBA_ file from Downloads.");
-  testStorage();
-});
-
-// Restore anything saved on this phone
-(function init() {
-  const k = store.get("ht_key"); if (k) $("key").value = k;
-  const t = store.get("ht_csv_text"); if (t) checkCSV(store.get("ht_csv_name") || "saved CSV", t, true);
-  testStorage();
-})();
+$('scan').addEventListener('click', scan);
+window.addEventListener('hashchange', () => { if (location.hash === '#demo') scan(); });
+if (location.hash === '#demo') scan();
+initSettings();
+loadSaved();
 </script>
 </body>
 </html>
