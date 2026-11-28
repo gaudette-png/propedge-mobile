@@ -13,7 +13,7 @@ const booting = (async () => {
   py = await loadPyodide();
   const t1 = performance.now();
   await py.loadPackage(['pandas', 'requests', 'tzdata']);   // tzdata: ZoneInfo has no system zones here
-  const app = await fetch('app.py?v=1', { cache: 'no-store' });
+  const app = await fetch('app.py?v=2', { cache: 'no-store' });
   if (!app.ok) throw new Error(`app.py: ${app.status}`);
   py.FS.mkdirTree(`${HOME}/app`);
   py.FS.writeFile(`${HOME}/app/app.py`, await app.text());
@@ -63,6 +63,24 @@ json.dumps(list(_mods))`));
     } finally {
       py.runPython("globals().pop('_key', None)");
     }
+  },
+
+  // PE_NBA.py all N on the SaberSim files + fetched lines; returns the tabs' rows.
+  async run({ inputs }) {
+    await booting;
+    py.globals.set('_inp', JSON.stringify(inputs));
+    try {
+      return JSON.parse(py.runPython('import app\napp.run(_inp)'));
+    } finally {
+      py.runPython("globals().pop('_inp', None)");
+    }
+  },
+
+  // Rebuild the tabs from the last run, leaving out games that have started.
+  async views({ started }) {
+    await booting;
+    py.globals.set('_started', JSON.stringify(started || []));
+    return JSON.parse(py.runPython('import app\napp.views(_started)'));
   },
 };
 

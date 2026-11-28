@@ -8,11 +8,12 @@
 <meta name="apple-mobile-web-app-title" content="PropEdge NBA">
 <meta name="robots" content="noindex">
 <title>PropEdge NBA</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
 /* NBA plays on the phone: the real PE_NBA.py and fetch_lines_nba.py, loaded at run
    time from the private propedge repo with a read-only token saved on this phone,
-   run by Pyodide in py-worker.js. Same look as halftime/index.html. */
+   run by Pyodide in py-worker.js (glue in app.py). The tabs mirror pe_nba_web.py.
+   Same look as halftime/index.html. */
 :root {
   --bg: #f3f5f7; --card: #ffffff; --fg: #17202a; --muted: #5c6875; --line: #d9dfe5; --accent: #1f5fbf;
   --ok: #1d7a46; --ok-bg: #e3f3ea; --warn: #7a5b00; --warn-bg: #fbf1d4; --bad: #b3261e; --bad-bg: #fbe7e5;
@@ -35,16 +36,18 @@ h2 { font-size: 1rem; margin: 0; }
 .inner { display: grid; gap: 14px; margin-top: 10px; }
 .field { display: grid; gap: 6px; min-width: 0; }
 .lab { font-weight: 600; font-size: 0.9rem; }
-button { font: 600 0.95rem var(--sans); background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 14px; cursor: pointer; }
-button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 8px 12px; }
-button:disabled { opacity: 0.5; cursor: default; }
-button:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button, .filebtn { font: 600 0.95rem var(--sans); background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 14px; cursor: pointer; text-align: center; }
+button.secondary, .filebtn.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 8px 12px; }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, summary:focus-visible, input:focus-visible, .filebtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type=file] { position: absolute; opacity: 0; width: 1px; height: 1px; }
 /* 16px keeps iOS from zooming in on the field */
 input.key { font: 16px var(--mono); padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
   background: var(--bg); color: var(--fg); flex: 1 1 180px; min-width: 0; }
 .notice { padding: 8px 10px; border-radius: 8px; font-size: 0.88rem; background: var(--warn-bg); color: var(--warn); }
 .notice.ok { background: var(--ok-bg); color: var(--ok); }
 .notice.bad { background: var(--bad-bg); color: var(--bad); }
+.notice b { font-weight: 700; }
 .pill { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.88rem; background: var(--ok-bg); color: var(--ok); }
 table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
 td { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: top; }
@@ -52,15 +55,45 @@ tr:first-child td { border-top: 0; }
 td.mark { width: 1.6em; text-align: center; }
 td.what { font: 0.82rem var(--mono); white-space: nowrap; }
 td.val { overflow-wrap: anywhere; }
-details summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
-details.help summary { font-weight: 400; color: var(--accent); }
+details > summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+details.help summary, details.out summary { font-weight: 400; font-size: 0.9rem; color: var(--accent); }
 a.btnlink { display: inline-block; margin-top: 8px; font: 600 0.95rem var(--sans); color: var(--accent); text-decoration: none;
   border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; }
 ol { margin: 6px 0 0; padding-left: 1.3em; font-size: 0.88rem; }
 li { margin: 3px 0; }
-pre { font: 0.72rem/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto;
+pre { font: 0.7rem/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto;
   background: var(--bg); border-radius: 8px; padding: 8px; margin: 8px 0 0; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* Files and run */
+.src { display: grid; gap: 4px; }
+.src .top { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.fname { font: 0.76rem var(--mono); overflow-wrap: anywhere; }
+#fetchrun { width: 100%; padding: 13px; font-size: 1.02rem; }
+.btn2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* Tonight's plays */
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tabs button, .seg button { background: transparent; color: var(--accent); border: 1px solid var(--line); padding: 8px 4px; font-size: 0.85rem; }
+.tabs button[aria-selected=true], .seg button[aria-pressed=true] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { padding: 7px 10px; }
+.sec { font-weight: 700; margin: 12px 0 2px; }
+.pl { display: flex; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
+.ix { flex: 0 0 1.9em; color: var(--muted); font: 600 0.8rem var(--mono); padding-top: 4px; }
+.pb { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.r1 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.bet, .need { margin-left: auto; font-weight: 600; text-align: right; }
+.r2 { font-size: 0.8rem; color: var(--muted); }
+.wr { white-space: nowrap; }
+.hi .bet, .hi .wr, .hi .need { color: var(--ok); font-weight: 700; }
+.nm { font: 600 0.95rem var(--sans); color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 3px 8px; }
+.nm.ok { background: var(--ok); color: #fff; border-color: var(--ok); }
+.tm { color: var(--muted); font-size: 0.8rem; }
+.grp { border-top: 2px solid var(--line); padding-top: 8px; margin-top: 4px; }
+.grp:first-of-type { border-top: 0; }
+.grp .pl { border-top: 0; padding: 4px 0; }
 </style>
 </head>
 <body>
@@ -120,52 +153,95 @@ pre { font: 0.72rem/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anyw
     </details>
   </section>
 
-  <section class="card" aria-labelledby="eng-h">
-    <h2 id="eng-h">Engine</h2>
-    <table id="etable" aria-live="polite"></table>
-    <div id="enote" class="notice" hidden></div>
-    <details id="edetail" hidden><summary>Error details</summary><pre id="elog"></pre></details>
-    <div class="row"><button class="secondary" id="reload">Reload engine</button></div>
+  <section class="card">
+    <details id="engine">
+      <summary id="engine-sum">Engine</summary>
+      <div class="inner">
+        <table id="etable" aria-live="polite"></table>
+        <div id="enote" class="notice" hidden></div>
+        <details id="edetail" class="out" hidden><summary>Error details</summary><pre id="elog"></pre></details>
+        <div class="row"><button class="secondary" id="reload">Reload engine</button></div>
+      </div>
+    </details>
   </section>
 
-  <section class="card" aria-labelledby="lines-h">
-    <h2 id="lines-h">Lines</h2>
-    <button id="fetch" disabled>Fetch lines</button>
-    <div id="fetch-hint" class="muted small"></div>
-    <div id="fnote" class="notice" hidden></div>
-    <table id="ltable" aria-live="polite"></table>
-    <div id="linfo" class="muted small" hidden></div>
-    <div class="row" id="lcopy" hidden>
-      <button class="secondary" id="copy">Copy report</button>
-      <span id="copied" class="muted small"></span>
+  <section class="card" aria-labelledby="run-h">
+    <h2 id="run-h">Files and run</h2>
+    <div class="src">
+      <div class="top">
+        <span class="lab">SaberSim</span>
+        <label class="filebtn secondary" for="ssfile">Choose file(s)<input type="file" id="ssfile" multiple></label>
+      </div>
+      <div id="ssinfo" class="small"></div>
     </div>
-    <details id="fdetail" hidden><summary>Fetch output</summary><pre id="flog"></pre></details>
+    <div class="src">
+      <span class="lab">Lines</span>
+      <div id="lninfo" class="small"></div>
+    </div>
+    <div id="fwarn" class="notice" hidden></div>
+    <button id="fetchrun" disabled>Fetch + Run</button>
+    <div class="btn2">
+      <button class="secondary" id="fetch" disabled>Fetch only</button>
+      <button class="secondary" id="run" disabled>Run only</button>
+    </div>
+    <div id="hint" class="muted small"></div>
+    <div id="rnote" class="notice" hidden></div>
+    <details id="outd" class="out" hidden><summary id="outsum">Output</summary><pre id="outlog"></pre></details>
+  </section>
+
+  <section class="card" id="plays" hidden aria-labelledby="plays-h">
+    <h2 id="plays-h">Tonight's plays</h2>
+    <div id="banner" class="notice"></div>
+    <div id="stale" class="notice" hidden></div>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="lineups" aria-controls="panel">⭐ Lineups</button>
+      <button role="tab" data-tab="check" aria-controls="panel">🔎 Pick6 check</button>
+      <button role="tab" data-tab="promos" aria-controls="panel">🎯 Promos</button>
+    </div>
+    <div id="panel" role="tabpanel"></div>
   </section>
 </main>
 
 <script>
 const REPO = 'gaudette-png/propedge';
 const ENGINE_FILES = ['PE_NBA.py', 'fetch_lines_nba.py'];
-// Local test on the Mac (python http.server on 127.0.0.1): the engine comes from
-// _dev/ next to this page instead of GitHub. _dev/ never goes in this repo.
+// Local test on the Mac (http server on 127.0.0.1): the engine comes from _dev/ next
+// to this page instead of GitHub (_dev/ never goes in this repo), and Fetch goes to
+// a mock Odds API the test server serves, unless ?real.
 const DEV = ['127.0.0.1', 'localhost'].includes(location.hostname);
-// Local test: fetch from the mock Odds API the test server serves, unless ?real.
 const ODDS_BASE = DEV && !new URLSearchParams(location.search).has('real')
   ? `${location.origin}/mock/v4/sports/basketball_nba` : '';
-const K = { token: 'nba_gh_token', odds: 'ht_key', cache: 'nba_engine_cache', lines: 'nba_lines' };
+const K = { token: 'nba_gh_token', odds: 'ht_key', cache: 'nba_engine_cache', lines: 'nba_lines',
+            ss: 'nba_ss_files', tab: 'nba_tab', plat: 'nba_plat' };
+const MAX_SS = 4;
 
 const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const secs = ms => (ms / 1000).toFixed(1) + ' s';
-const when = t => new Date(t).toLocaleString([], { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const when = t => new Date(t).toDateString() === new Date().toDateString()   // today: time only
+  ? new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  : new Date(t).toLocaleString([], { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+// Short stat names so a bet fits on the name's line at phone width
+const SHORT_STAT = { 'Pts+Rebs+Asts': 'PRA', 'Pts+Rebs': 'PR', 'Pts+Asts': 'PA', 'Rebs+Asts': 'RA',
+                     'Blks+Stls': 'Blk+Stl', 'Fantasy Score': 'Fantasy' };
+const stat = s => SHORT_STAT[s] || s;
+const clock = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const f1 = v => v == null ? '–' : Number(v).toFixed(1);
+const f2 = v => v == null ? '–' : Number(v).toFixed(2);
+const todayET = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+function ago(t) {
+  const m = Math.max(0, Math.floor((Date.now() - t) / 60000));
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} m`;
+}
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
   del(k) { try { localStorage.removeItem(k); } catch (e) {} },
 };
+const load = (k, d) => { try { return JSON.parse(store.get(k) || 'null') ?? d; } catch (e) { return d; } };
 
 // --- Python worker ---
-const worker = new Worker('py-worker.js?v=3');
+const worker = new Worker('py-worker.js?v=4');
 let seq = 0;
 const pending = new Map();
 worker.onmessage = ({ data }) => {
@@ -189,10 +265,18 @@ const S = {
   py: 'loading', pyInfo: null, pyErr: '',
   loading: false, files: null, source: null, loadErr: null,  // engine files
   imported: null, importErr: '',                              // null | 'ok' | 'error'
-  fetching: false, lines: null, linesSaved: true,             // lines: last fetch with CSVs
-  fetchNote: null, fetchLog: '',
+  ss: load(K.ss, []),               // SaberSim: [{name, at, text}], newest first
+  lines: load(K.lines, null),       // last fetch: {at, files, summary, remaining, games, slate}
+  busy: null,                       // 'fetch' | 'run'
+  note: null, warn: null,           // {cls, text} under the buttons / above them
+  logs: { fetch: '', run: '' },
+  result: null,                     // last run (app.run), with .at and .key
+  tab: store.get(K.tab) || 'lineups',
+  plat: store.get(K.plat) || '',
+  engineCat: '',
 };
-try { S.lines = JSON.parse(store.get(K.lines) || 'null'); } catch (e) {}
+const engineOk = () => S.imported === 'ok';
+const inputsKey = () => `${S.lines?.at}|${S.ss.map(f => f.name + f.at).join(',')}`;
 
 function header(text, key) {
   const m = text.match(new RegExp(`^# ${key}:\\s*(\\S+)`, 'm'));
@@ -234,10 +318,8 @@ async function fromDev() {
 }
 
 function savedCopy() {
-  try {
-    const c = JSON.parse(store.get(K.cache) || 'null');
-    return c && ENGINE_FILES.every(n => typeof c.files?.[n] === 'string') ? c : null;
-  } catch (e) { return null; }
+  const c = load(K.cache, null);
+  return c && ENGINE_FILES.every(n => typeof c.files?.[n] === 'string') ? c : null;
 }
 
 async function loadEngine() {
@@ -266,12 +348,12 @@ async function loadEngine() {
     try { await call('engine', { files: S.files }); S.imported = 'ok'; }
     catch (e) { S.imported = 'error'; S.importErr = e.message; }
     render();
+    if (engineOk() && S.ss.length && S.lines && !S.busy) runEngine();   // runs are free: show plays on open
   }
 }
 
-// --- Render ---
+// --- Render: setup, engine, files and run ---
 function render() {
-  // Setup
   const token = store.get(K.token), odds = store.get(K.odds);
   $('token-saved').hidden = !token;
   $('token-entry').hidden = !!token;
@@ -280,18 +362,20 @@ function render() {
   const tokenOk = DEV || !!token;
   $('setup-sum').textContent = `Setup · ${tokenOk ? '✅' : '◻️'} GitHub token · ${odds ? '✅' : '◻️'} Odds API key`;
 
-  // Engine table
+  // Engine
   const rows = [];
   const py = S.py === 'ready'
     ? ['✅', `Ready in ${secs(S.pyInfo.t_python + S.pyInfo.t_packages)} · Python ${S.pyInfo.python}, pandas ${S.pyInfo.pandas}`]
     : S.py === 'error' ? ['❌', "Didn't start (see Error details)"] : ['⏳', 'Starting…'];
   rows.push([py[0], 'Python', py[1]]);
+  const versions = [];
   for (const n of ENGINE_FILES) {
     let mark, val;
     if (S.loading) { mark = '⏳'; val = DEV ? 'Loading from this Mac…' : 'Loading from GitHub…'; }
     else if (!S.files) { mark = tokenOk ? '❌' : '◻️'; val = tokenOk ? 'Not loaded' : 'Needs the GitHub token (Setup)'; }
     else {
       const v = header(S.files[n], 'Version'), d = header(S.files[n], 'Last Updated');
+      versions.push(`${n.replace('.py', '')} v${v || '?'}`);
       val = `v${v || '?'}${d ? ` · updated ${d}` : ''}`;
       mark = S.imported === 'ok' ? '✅' : S.imported === 'error' ? '❌' : '⏳';
       if (S.imported === null) val += ' · checking…';
@@ -306,93 +390,277 @@ function render() {
   }
   $('etable').innerHTML = rows.map(([m, w, v]) =>
     `<tr><td class="mark">${m}</td><td class="what">${esc(w)}</td><td class="val">${esc(v)}</td></tr>`).join('');
-
-  // Notice under the table
   let note = '', cls = 'notice';
   if (S.loadErr && S.files) note = `${S.loadErr} Using the copy saved on this phone from ${when(S.source.at)} instead.`;
   else if (S.loadErr) { note = S.loadErr; cls += ' bad'; }
   else if (S.py === 'error') { note = 'Python didn\'t start. Check the connection and reload the page.'; cls += ' bad'; }
   else if (S.imported === 'error') { note = 'The engine loaded but Python couldn\'t import it.'; cls += ' bad'; }
-  else if (S.imported === 'ok' && S.py === 'ready') { note = 'Engine ready.'; cls += ' ok'; }
   $('enote').hidden = !note;
   $('enote').className = cls;
   $('enote').textContent = note;
   const detail = S.pyErr || S.importErr;   // a failed start also fails the import: show it once
   $('edetail').hidden = !detail;
   $('elog').textContent = detail;
-  $('reload').disabled = S.loading || !tokenOk;
-  renderLines(odds);
+  $('reload').disabled = S.loading || !tokenOk || !!S.busy;
+  const cat = engineOk() && !S.loadErr ? 'ok' : (S.loadErr || S.py === 'error' || S.imported === 'error' || !tokenOk) ? 'bad' : 'wait';
+  $('engine-sum').textContent = cat === 'ok' ? `Engine · ✅ ${versions.join(' · ')}${S.source?.kind === 'saved' ? ' (saved copy)' : ''}`
+    : cat === 'bad' ? 'Engine · ❌ needs attention' : 'Engine · ⏳ starting…';
+  if (cat !== S.engineCat) { $('engine').open = cat === 'bad'; S.engineCat = cat; }
+
+  renderFiles(odds);
 }
 
-function renderLines(odds) {
-  const engineOk = S.py === 'ready' && S.imported === 'ok';
-  $('fetch').disabled = S.fetching || !engineOk || !(odds || DEV);
-  $('fetch').textContent = S.fetching ? 'Fetching…' : S.lines ? 'Fetch new lines' : 'Fetch lines';
-  $('fetch-hint').textContent = S.fetching ? 'Getting every game\'s props from the Odds API. Usually 10–30 s.'
-    : !(odds || DEV) ? 'Add the Odds API key in Setup first.'
-    : !engineOk ? 'Waits for the engine.'
-    : `Uses Odds API credits: about 130 on a 10-game slate.${ODDS_BASE ? ' (Local test: mock Odds API.)' : ''}`;
-
-  const n = S.fetchNote;
-  $('fnote').hidden = !n;
-  if (n) { $('fnote').className = 'notice ' + (n.cls || ''); $('fnote').textContent = n.text; }
-
-  const L = S.lines;
-  $('ltable').innerHTML = L ? L.summary.map(s =>
-    `<tr><td class="mark">✅</td><td>${esc(s.platform)}</td><td class="val">${s.rows.toLocaleString()} props</td></tr>`).join('') : '';
-  $('linfo').hidden = $('lcopy').hidden = !L;
-  if (L) {
-    const bits = [L.slate ? `Slate ${L.slate}` : '', L.games ? `${L.games} games` : '', `fetched ${when(L.at)}`,
-                  L.remaining ? `${Number(L.remaining).toLocaleString()} credits left` : ''];
-    $('linfo').textContent = bits.filter(Boolean).join(' · ') +
-      (S.linesSaved ? '' : '. Not saved on this phone (storage full?): reloading the page loses them.');
+function renderFiles(odds) {
+  const today = todayET();
+  // SaberSim
+  if (!S.ss.length) {
+    $('ssinfo').innerHTML = '<span class="muted">None chosen. Download tonight\'s SaberSim CSV, then choose it here (several for split slates).</span>';
+  } else {
+    $('ssinfo').innerHTML = S.ss.map(f =>
+      `<div class="fname">${esc(f.name)}</div><div class="muted">saved ${esc(when(f.at))} (${ago(f.at)} ago)</div>`).join('')
+      + (S.ss.length > 1 ? `<div class="muted">Merged, N = ${S.ss.length} (newest file wins a player in both)</div>` : '');
   }
-  $('fdetail').hidden = !S.fetchLog;
-  $('flog').textContent = S.fetchLog;
-}
-
-function report() {
+  // Lines
   const L = S.lines;
-  return [
-    `NBA phone fetch, ${new Date(L.at).toLocaleString()}`,
-    `Slate ${L.slate}, ${L.games} games, ${L.secs} s, credits left ${L.remaining}`,
-    ...L.summary.map(s => `${s.platform}: ${s.rows} rows, fp ${s.fp}`),
-    `Files: ${L.summary.map(s => s.name).join(', ')}`,
-    navigator.userAgent,
-  ].join('\n');
+  $('lninfo').innerHTML = !L ? '<span class="muted">Not fetched yet.</span>'
+    : `<div>Fetched ${esc(when(L.at))} (${ago(L.at)} ago)${L.slate ? ` · slate ${esc(L.slate)}` : ''}</div>
+       <div class="muted">${L.summary.map(s => `${esc(s.platform)} ${s.rows.toLocaleString()}`).join(' · ')}${L.remaining ? ` · ${Number(L.remaining).toLocaleString()} credits left` : ''}</div>`;
+
+  // Warnings about the inputs
+  const warns = [];
+  const ssDates = S.ss.map(f => (f.name.match(/NBA_(\d{4}-\d{2}-\d{2})/) || [])[1]).filter(Boolean);
+  if (S.ss.length && ssDates.length && !ssDates.includes(today))
+    warns.push(`The SaberSim file is for ${ssDates[0]}, not tonight (${today}). Choose tonight's file.`);
+  if (L && L.slate && L.slate !== today) warns.push(`These lines are for ${L.slate}, not tonight. Fetch again.`);
+  $('fwarn').hidden = !warns.length;
+  $('fwarn').textContent = warns.join(' ');
+
+  // Buttons
+  const keyOk = !!(odds || DEV);
+  $('fetchrun').disabled = !!S.busy || !engineOk() || !keyOk || !S.ss.length;
+  $('fetch').disabled = !!S.busy || !engineOk() || !keyOk;
+  $('run').disabled = !!S.busy || !engineOk() || !S.ss.length || !L;
+  $('fetchrun').textContent = S.busy === 'fetch' ? 'Fetching lines…' : S.busy === 'run' ? 'Running PE_NBA.py…'
+    : `Fetch + Run PE_NBA.py all ${Math.max(1, S.ss.length)}`;
+  $('hint').textContent = S.busy === 'fetch' ? 'Getting every game\'s props from the Odds API. Usually 10–30 s.'
+    : !engineOk() ? 'Waits for the engine.'
+    : !keyOk ? 'Add the Odds API key in Setup to fetch lines.'
+    : !S.ss.length ? 'Choose tonight\'s SaberSim file to run.'
+    : `Fetch uses Odds API credits (about 130 on a 10-game slate). Run only re-runs on the lines above, free.${ODDS_BASE ? ' Local test: mock Odds API.' : ''}`;
+  const n = S.note;
+  $('rnote').hidden = !n;
+  if (n) { $('rnote').className = 'notice ' + (n.cls || ''); $('rnote').textContent = n.text; }
+  const parts = [];
+  if (S.logs.fetch) parts.push(`===== fetch_lines_nba.py =====\n${S.logs.fetch}`);
+  if (S.logs.run) parts.push(`===== PE_NBA.py all ${S.result?.n || S.ss.length} =====\n${S.logs.run}`);
+  $('outd').hidden = !parts.length;
+  $('outlog').textContent = parts.join('\n\n');
 }
 
-// --- Fetch ---
-$('fetch').addEventListener('click', async () => {
+// --- Render: tonight's plays ---
+function slateLabel(d) {
+  const [y, m, dd] = d.split('-').map(Number);
+  const [ty, tm, td] = todayET().split('-').map(Number);
+  const delta = Math.round((Date.UTC(y, m - 1, dd) - Date.UTC(ty, tm - 1, td)) / 864e5);
+  const rel = { 0: 'today', '-1': 'yesterday', 1: 'tomorrow' }[delta];
+  return new Date(y, m - 1, dd).toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })
+    + (rel ? ` (${rel})` : '');
+}
+
+const nameBtn = p => `<button class="nm" data-n="${esc(p.player)}">${esc(p.player)}</button><span class="tm">${esc(p.team)}</span>`;
+function mins(m) {
+  const bench = /b$/.test(m);
+  return `${esc(String(m).replace(/b$/, ''))} min${bench ? ' (bench)' : ''}`;
+}
+
+function playRow(p, ix, hi) {
+  return `<div class="pl${p.win >= hi ? ' hi' : ''}"><span class="ix">${esc(ix)}</span><div class="pb">
+    <div class="r1">${nameBtn(p)}<span class="bet">${esc(p.side)} ${f1(p.line)} ${esc(stat(p.stat))}</span></div>
+    <div class="r2">Proj ${f2(p.proj)} · ${mins(p.min)} · gap ${f1(p.gap)}% · <span class="wr">win ${f1(p.win)}%</span> · ${esc(p.band)}${p.inj ? ` · 🚑 ${esc(p.inj)}` : ''}</div>
+  </div></div>`;
+}
+
+function lineupsPanel(R) {
+  const hi = R.const.hi;
+  let h = `<div class="muted small">Tap a name to copy it. Each player in one lineup per platform (one stat), max ${R.const.per_game} per game. Sorted by win % of the stat/side × minutes band. Green = win ≥ ${f1(hi)}%.</div>`;
+  h += `<div class="notice small">${esc(String(R.const.warning).replace(/^⚠️\s*/, ''))}</div>`;
+  if (!R.n_qualifying) return h + '<div class="notice">No qualifying recommended plays in this run.</div>';
+  const plats = R.lineups.map(([plat]) => plat);
+  const firstFull = (R.lineups.find(([, ls]) => ls.length) || R.lineups[0])[0];
+  const pick = plats.includes(S.plat) ? S.plat : firstFull;
+  h += '<div class="seg" role="group" aria-label="Platform">' + R.lineups.map(([plat, ls]) =>
+    `<button data-plat="${esc(plat)}" aria-pressed="${plat === pick}">${esc(plat)} (${ls.length})</button>`).join('') + '</div>';
+  const lineups = (R.lineups.find(([plat]) => plat === pick) || [, []])[1];
+  if (!lineups.length) h += `<div class="notice">No full ${R.const.slip}-pick lineup possible on ${esc(pick)}.</div>`;
+  lineups.forEach((lu, i) => {
+    h += `<div class="sec">📋 Lineup ${i + 1}</div>` + lu.map((p, j) => playRow(p, j + 1, hi)).join('');
+  });
+  h += `<div class="sec">🪑 Leftovers: qualified but not in any lineup (${R.leftovers.length})</div>`;
+  h += R.leftovers.length ? R.leftovers.map(p => playRow(p, p.plt, hi)).join('') : '<div class="muted small">None.</div>';
+  return h;
+}
+
+function checkPanel(R) {
+  const hi = R.const.hi;
+  let h = '<div class="muted small">Tap a name to copy it into Pick6\'s search. Check in order; if a play isn\'t on Pick6, try that player\'s next letter. Take the Under only at a line ≥ Need with normal payout.</div>';
+  if (!R.platforms.includes('Pick6'))
+    h += '<div class="notice">This run had no Pick6 file, so plays Pick6 already posts as Unders aren\'t filtered out.</div>';
+  if (!R.checklist.length) return h + '<div class="notice ok">No qualifying PP/UD Unders on those stats in this run.</div>';
+  let prev = null;
+  for (const e of R.checklist) {
+    if (e.player !== prev) {
+      if (prev !== null) h += '</div>';
+      h += `<div class="grp"><div class="r1">${nameBtn(e)}</div>`;
+      prev = e.player;
+    }
+    h += `<div class="pl${e.win >= hi ? ' hi' : ''}"><span class="ix">${esc(e.tag)}</span><div class="pb">
+      <div class="r1"><span>Under · ${esc(stat(e.stat))}</span><span class="need">Need ≥ ${f1(e.need)}</span></div>
+      <div class="r2">PP ${f1(e.pp)} · UD ${f1(e.ud)} · proj ${f1(e.proj)} · ${esc(e.min)} min · <span class="wr">win ${f1(e.win)}%</span> · ${esc(e.band)}</div>
+    </div></div>`;
+  }
+  return h + '</div>';
+}
+
+function promosPanel(R) {
+  if (!R.platforms.includes('Pick6')) return '<div class="notice">This run had no Pick6 file.</div>';
+  if (!R.promos.length) return '<div class="notice">No qualifying promo plays in this run.</div>';
+  return '<div class="muted small">Over-only Pick6 lines below the player\'s regular line, ranked by gap. Tap a name to copy it.</div>'
+    + R.promos.map((p, i) => `<div class="pl"><span class="ix">${i + 1}</span><div class="pb">
+        <div class="r1">${nameBtn(p)}<span class="bet">${esc(p.side)} ${f1(p.line)} ${esc(stat(p.stat))}</span></div>
+        <div class="r2">Proj ${f2(p.proj)} · gap ${f1(p.gap)}%${p.inj ? ` · 🚑 ${esc(p.inj)}` : ''}</div>
+      </div></div>`).join('');
+}
+
+function renderPlays() {
+  const R = S.result;
+  $('plays').hidden = !R;
+  if (!R) return;
+  const today = todayET();
+  const isToday = R.dates.length === 1 && R.dates[0] === today;
+  const label = R.dates.map(slateLabel).join(' + ') || 'unknown date';
+  $('banner').className = 'notice ' + (isToday ? 'ok' : '');
+  $('banner').innerHTML = `📅 <b>Plays for ${esc(label)}${isToday ? '' : ', not today'}</b><br>`
+    + `Run ${esc(clock(R.at))} · ${esc(R.platforms.join(', '))} · ${R.games} games`
+    + (isToday ? '' : '. Fetch + Run again for tonight\'s slate.');
+  const stale = R.key !== inputsKey();
+  $('stale').hidden = !stale;
+  $('stale').textContent = '🔄 The SaberSim file or lines changed since this run. Run again.';
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === S.tab)));
+  $('panel').innerHTML = S.tab === 'check' ? checkPanel(R) : S.tab === 'promos' ? promosPanel(R) : lineupsPanel(R);
+}
+
+// --- Actions ---
+async function doFetch() {
   const key = store.get(K.odds) || (DEV ? 'local-test' : '');
-  if (!key || S.fetching) return;
-  Object.assign(S, { fetching: true, fetchNote: null, fetchLog: '' });
+  if (!key || S.busy) return false;
+  Object.assign(S, { busy: 'fetch', note: null });
+  S.logs.fetch = '';
   render();
+  let ok = false;
   try {
     const r = await call('fetch', { key, base: ODDS_BASE });
-    S.fetchLog = r.log;
+    S.logs.fetch = r.log;
     const problems = r.log.split('\n').map(l => l.trim()).filter(l => /^(❌|⚠️)/.test(l));
     if (r.summary.length) {
       S.lines = { at: Date.now(), files: r.files, summary: r.summary, remaining: r.remaining,
                   games: r.games, slate: r.slate, secs: r.secs };
-      S.linesSaved = store.set(K.lines, JSON.stringify(S.lines));
+      const saved = store.set(K.lines, JSON.stringify(S.lines));
       const failed = problems.filter(l => /Error fetching/.test(l));
-      if (failed.length) S.fetchNote = { text: `${failed.length} game(s) failed (see Fetch output); the rest are in.` };
+      if (failed.length) S.note = { text: `${failed.length} game(s) failed to fetch (see Output); the rest are in.` };
+      else if (!saved) S.note = { text: 'Lines fetched but not saved on this phone (storage full?): reloading the page loses them.' };
+      ok = true;
     } else {
-      S.fetchNote = { cls: r.code ? 'bad' : '', text: problems.join(' ') || 'The fetch returned no lines (see Fetch output).' };
+      S.note = { cls: r.code ? 'bad' : '', text: problems.join(' ') || 'The fetch returned no lines (see Output).' };
     }
   } catch (e) {
-    S.fetchNote = { cls: 'bad', text: 'The fetch failed (see Fetch output).' };
-    S.fetchLog = e.message;
+    S.note = { cls: 'bad', text: 'The fetch failed (see Output).' };
+    S.logs.fetch = e.message;
   }
-  S.fetching = false;
+  S.busy = null;
   render();
+  return ok;
+}
+
+async function runEngine() {
+  if (S.busy || !engineOk() || !S.ss.length || !S.lines) return;
+  S.busy = 'run';
+  if (S.note?.cls === 'bad') S.note = null;
+  S.logs.run = '';
+  render();
+  const key = inputsKey();
+  try {
+    const r = await call('run', { inputs: { sabersim: S.ss, lines: S.lines.files, lines_at: S.lines.at } });
+    S.logs.run = r.log + (r.fp ? `\n\nfingerprints ${JSON.stringify(r.fp)}` : '');
+    if (r.ok) S.result = { ...r, at: Date.now(), key };
+    else S.note = { cls: 'bad', text: `The engine found no plays. ${r.error}` };
+  } catch (e) {
+    S.note = { cls: 'bad', text: 'The run failed (see Output).' };
+    S.logs.run = e.message;
+  }
+  S.busy = null;
+  render();
+  renderPlays();
+}
+
+$('fetchrun').addEventListener('click', async () => { if (await doFetch()) await runEngine(); });
+$('fetch').addEventListener('click', () => doFetch().then(renderPlays));
+$('run').addEventListener('click', runEngine);
+
+// SaberSim files: keep the CSV text (the engine reads the file itself)
+async function setSaberSim(files) {
+  const good = [], bad = [];
+  for (const f of files) {
+    const head = f.text.slice(0, 2000).split('\n')[0].toLowerCase().split(',').map(c => c.trim().replace(/"/g, ''));
+    if (/^wnba/i.test(f.name) || !['ss proj', 'saber team', 'dfs id'].some(k => head.includes(k))) bad.push(f.name);
+    else good.push(f);
+  }
+  if (good.length) {
+    S.ss = good.sort((a, b) => b.at - a.at).slice(0, MAX_SS);
+    if (!store.set(K.ss, JSON.stringify(S.ss))) S.note = { text: 'SaberSim file not saved on this phone (storage full?): reloading the page loses it.' };
+    else if (S.note && !S.note.cls) S.note = null;
+  }
+  if (bad.length) S.note = { cls: 'bad', text: `Not an NBA SaberSim export, skipped: ${bad.join(', ')}` };
+  if (good.length > MAX_SS) S.note = { text: `Kept the newest ${MAX_SS} files.` };
+  render();
+  renderPlays();
+  if (good.length && S.lines) runEngine();
+}
+$('ssfile').addEventListener('change', async e => {
+  const files = await Promise.all([...e.target.files].map(async f => ({ name: f.name, at: f.lastModified || Date.now(), text: await f.text() })));
+  e.target.value = '';
+  if (files.length) setSaberSim(files);
 });
 
-$('copy').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(report()); $('copied').textContent = 'Copied ✓'; }
-  catch (e) { $('copied').textContent = 'Copy failed.'; }
-  setTimeout(() => { $('copied').textContent = ''; }, 2000);
+// Tabs, platform, name copy
+document.querySelector('.tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]');
+  if (!b) return;
+  S.tab = b.dataset.tab;
+  store.set(K.tab, S.tab);
+  renderPlays();
+});
+function copyText(t) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t).catch(() => fallback(t));
+  fallback(t);
+  return Promise.resolve();
+}
+function fallback(t) {
+  const ta = document.createElement('textarea');
+  ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, t.length);
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+}
+$('panel').addEventListener('click', e => {
+  const p = e.target.closest('button[data-plat]');
+  if (p) { S.plat = p.dataset.plat; store.set(K.plat, S.plat); renderPlays(); return; }
+  const b = e.target.closest('.nm');
+  if (!b || b.classList.contains('ok')) return;
+  const n = b.dataset.n;
+  copyText(n).then(() => {
+    b.textContent = 'Copied ✓'; b.classList.add('ok');
+    setTimeout(() => { b.textContent = n; b.classList.remove('ok'); }, 1000);
+  });
 });
 
 // --- Setup actions ---
@@ -433,12 +701,13 @@ $('odds-save').addEventListener('click', () => {
 $('reload').addEventListener('click', loadEngine);
 
 // --- Start ---
-if (store.get(K.token) || DEV) $('setup').open = !store.get(K.odds);
+$('setup').open = !((store.get(K.token) || DEV) && store.get(K.odds));
 $('token-help').open = !store.get(K.token);   // no token yet: show how to get one
 render();
 call('boot').then(info => { S.py = 'ready'; S.pyInfo = info; render(); })
             .catch(e => { S.py = 'error'; S.pyErr = e.message; render(); });
 loadEngine();
+setInterval(() => { if (!S.busy) render(); }, 60000);   // keep the ages current (not the plays: a copy may be showing)
 </script>
 </body>
 </html>
