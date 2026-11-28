@@ -13,7 +13,7 @@ const booting = (async () => {
   py = await loadPyodide();
   const t1 = performance.now();
   await py.loadPackage(['pandas', 'requests', 'tzdata']);   // tzdata: ZoneInfo has no system zones here
-  const app = await fetch('app.py?v=2', { cache: 'no-store' });
+  const app = await fetch('app.py?v=3', { cache: 'no-store' });
   if (!app.ok) throw new Error(`app.py: ${app.status}`);
   py.FS.mkdirTree(`${HOME}/app`);
   py.FS.writeFile(`${HOME}/app/app.py`, await app.text());

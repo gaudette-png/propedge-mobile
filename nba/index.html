@@ -94,6 +94,11 @@ pre { font: 0.7rem/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anywh
 .grp { border-top: 2px solid var(--line); padding-top: 8px; margin-top: 4px; }
 .grp:first-of-type { border-top: 0; }
 .grp .pl { border-top: 0; padding: 4px 0; }
+.tip { font-weight: 600; color: var(--fg); }
+.tog { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.92rem; }
+.tog input { width: 20px; height: 20px; accent-color: var(--accent); margin: 0; }
+#fwarns { display: grid; gap: 6px; }
+#fwarns:empty { display: none; }
 </style>
 </head>
 <body>
@@ -192,7 +197,12 @@ pre { font: 0.7rem/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anywh
   <section class="card" id="plays" hidden aria-labelledby="plays-h">
     <h2 id="plays-h">Tonight's plays</h2>
     <div id="banner" class="notice"></div>
+    <div id="fresh" class="muted small" hidden></div>
+    <div id="fwarns"></div>
     <div id="stale" class="notice" hidden></div>
+    <label class="tog" id="togrow" hidden><input type="checkbox" id="hide" checked> <span id="toglab"></span></label>
+    <div id="startcap" class="muted small" hidden></div>
+    <div id="allstarted" class="notice" hidden>Every game on this slate has started.</div>
     <div class="tabs" role="tablist">
       <button role="tab" data-tab="lineups" aria-controls="panel">⭐ Lineups</button>
       <button role="tab" data-tab="check" aria-controls="panel">🔎 Pick6 check</button>
@@ -214,6 +224,14 @@ const ODDS_BASE = DEV && !new URLSearchParams(location.search).has('real')
 const K = { token: 'nba_gh_token', odds: 'ht_key', cache: 'nba_engine_cache', lines: 'nba_lines',
             ss: 'nba_ss_files', tab: 'nba_tab', plat: 'nba_plat' };
 const MAX_SS = 4;
+// Tip times + started games from ESPN's public scoreboard (no Odds API credits), as
+// pe_nba_web.py. SaberSim and ESPN mix short and NBA codes (GS / GSW): compare on NBA codes.
+const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard';
+const TEAM_CANON = { GS: 'GSW', NO: 'NOP', NY: 'NYK', SA: 'SAS', WSH: 'WAS', UTAH: 'UTA', PHO: 'PHX' };
+const canon = t => TEAM_CANON[t] || String(t);
+const gkey = (a, b) => [canon(a), canon(b)].sort().join('|');
+// Freshness warnings, same thresholds as the Mac page
+const LINES_STALE_MIN = 60, SABERSIM_STALE_MIN = 120, SABERSIM_LOCK_MIN = 60;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -229,10 +247,11 @@ const clock = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute:
 const f1 = v => v == null ? '–' : Number(v).toFixed(1);
 const f2 = v => v == null ? '–' : Number(v).toFixed(2);
 const todayET = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-function ago(t) {
-  const m = Math.max(0, Math.floor((Date.now() - t) / 60000));
+function fmtMin(minutes) {
+  const m = Math.max(0, Math.floor(minutes));
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} m`;
 }
+const ago = t => fmtMin((Date.now() - t) / 60000);
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
@@ -241,7 +260,7 @@ const store = {
 const load = (k, d) => { try { return JSON.parse(store.get(k) || 'null') ?? d; } catch (e) { return d; } };
 
 // --- Python worker ---
-const worker = new Worker('py-worker.js?v=4');
+const worker = new Worker('py-worker.js?v=5');
 let seq = 0;
 const pending = new Map();
 worker.onmessage = ({ data }) => {
@@ -271,6 +290,11 @@ const S = {
   note: null, warn: null,           // {cls, text} under the buttons / above them
   logs: { fetch: '', run: '' },
   result: null,                     // last run (app.run), with .at and .key
+  view: null,                       // the tabs' rows: the run's, or rebuilt without started games
+  games: null,                      // ESPN: Map gkey -> {start, state, detail, label}; null = unreachable
+  espnAt: 0,
+  started: [],                      // gkeys of this slate's games that have tipped
+  hideStarted: true,
   tab: store.get(K.tab) || 'lineups',
   plat: store.get(K.plat) || '',
   engineCat: '',
@@ -457,6 +481,99 @@ function renderFiles(odds) {
   $('outlog').textContent = parts.join('\n\n');
 }
 
+// --- ESPN: tip times and started games ---
+function shortStatus(detail) {   // '6:42 - 1st' → 'Q1 6:42', 'End of 3rd' → 'End Q3', as pe_nba_web.py
+  const d = (detail || '').trim();
+  let m = d.match(/^([\d:.]+) - (\d)(?:st|nd|rd|th)$/);
+  if (m) return `Q${m[2]} ${m[1]}`;
+  m = d.match(/^([\d:.]+) - (\d*OT)$/);
+  if (m) return `${m[2]} ${m[1]}`;
+  m = d.match(/^End of (\d)(?:st|nd|rd|th)$/);
+  if (m) return `End Q${m[1]}`;
+  return d === 'Halftime' ? 'Half' : (d || 'started');
+}
+
+async function loadGames(dates, force = false) {
+  if (!force && S.games && Date.now() - S.espnAt < 60000) return;
+  const games = new Map();
+  let ok = true;
+  for (const d of dates) {
+    try {
+      const r = await fetch(`${ESPN}?dates=${d.replace(/-/g, '')}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(String(r.status));
+      for (const e of (await r.json()).events || []) {
+        const cs = e.competitions?.[0]?.competitors || [];
+        if (cs.length !== 2) continue;
+        const away = cs.find(c => c.homeAway === 'away') || cs[0], home = cs.find(c => c !== away);
+        const st = e.status?.type || {};
+        games.set(gkey(away.team.abbreviation, home.team.abbreviation), {
+          start: new Date(e.date), state: st.state || 'pre', detail: st.shortDetail || '',
+          label: `${away.team.abbreviation} @ ${home.team.abbreviation}` });
+      }
+    } catch (e) { ok = false; }
+  }
+  S.games = ok || games.size ? games : null;
+  S.espnAt = Date.now();
+}
+
+const hhmm = d => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+function tipText(p) {   // local tip time, 'tipping', or 🔒 + the game's status once it has started
+  const g = S.games?.get(gkey(p.team, p.opp));
+  if (!g) return '';
+  if (g.state === 'pre') return g.start <= new Date() ? 'tipping' : hhmm(g.start).replace(/\s?[AP]M$/i, '');
+  return `🔒 ${shortStatus(g.detail)}`;
+}
+const tipSpan = p => { const t = tipText(p); return t ? `<span class="tip">${esc(t)}</span> · ` : ''; };
+const slateKeys = R => R.matchups.map(([a, b]) => gkey(a, b));
+
+// After a run: which of its games have tipped, then the tabs with or without them.
+async function applyStarted() {
+  if (!S.result) return;
+  await loadGames(S.result.dates, true);
+  S.started = S.games ? slateKeys(S.result).filter(k => S.games.get(k) && S.games.get(k).state !== 'pre') : [];
+  await rebuildView();
+}
+async function rebuildView() {
+  const R = S.result;
+  if (S.hideStarted && S.started.length) {
+    try { S.view = await call('views', { started: S.started.flatMap(k => k.split('|')) }); }
+    catch (e) { S.view = null; S.note = { cls: 'bad', text: `Couldn't leave out the started games: ${e.message}` }; render(); }
+  } else S.view = null;   // the run's own rows
+  renderPlays();
+}
+
+// Ages, next tip and the ⏰ 🚑 warnings (today's slate only), redrawn every minute
+function renderFresh() {
+  const R = S.result;
+  if (!R) return;
+  const bits = [], warns = [];
+  if (R.dates.length === 1 && R.dates[0] === todayET()) {
+    const now = Date.now();
+    const games = S.games ? slateKeys(R).map(k => S.games.get(k)).filter(Boolean) : [];
+    const upcoming = games.filter(g => g.state === 'pre').map(g => g.start.getTime());
+    const nextTip = upcoming.length ? Math.min(...upcoming) : null;
+    const linesAge = S.lines ? (now - S.lines.at) / 60000 : null;
+    const ssAt = S.ss.length ? Math.min(...S.ss.map(f => f.at)) : null;
+    const ssAge = ssAt ? (now - ssAt) / 60000 : null;
+    if (linesAge != null) bits.push(`Lines fetched ${fmtMin(linesAge)} ago`);
+    if (ssAge != null) bits.push(`SaberSim ${fmtMin(ssAge)} old`);
+    if (nextTip) {
+      const to = (nextTip - now) / 60000;
+      bits.push(`next tip ${hhmm(new Date(nextTip))} ${to > 0 ? `(in ${fmtMin(to)})` : '(tipping now)'}`);
+    }
+    if (upcoming.length && linesAge > LINES_STALE_MIN)
+      warns.push(`⏰ Lines are ${fmtMin(linesAge)} old and move during the day. Fetch + Run again before you lock in.`);
+    if (nextTip && ssAge > SABERSIM_STALE_MIN && (nextTip - now) / 60000 <= SABERSIM_LOCK_MIN)
+      warns.push(`🚑 SaberSim projections are ${fmtMin(ssAge)} old and the next game tips at ${hhmm(new Date(nextTip))}. Re-download for late scratches, then run again.`);
+    const newly = games.filter(g => g.state !== 'pre').length - S.started.length;
+    if (S.games && newly > 0)
+      warns.push(`🔒 ${newly} more game${newly > 1 ? 's have' : ' has'} tipped since this run. Tap Run only to leave ${newly > 1 ? 'them' : 'it'} out (free).`);
+  }
+  $('fresh').hidden = !bits.length;
+  $('fresh').textContent = bits.join(' · ');
+  $('fwarns').innerHTML = warns.map(w => `<div class="notice">${esc(w)}</div>`).join('');
+}
+
 // --- Render: tonight's plays ---
 function slateLabel(d) {
   const [y, m, dd] = d.split('-').map(Number);
@@ -476,7 +593,7 @@ function mins(m) {
 function playRow(p, ix, hi) {
   return `<div class="pl${p.win >= hi ? ' hi' : ''}"><span class="ix">${esc(ix)}</span><div class="pb">
     <div class="r1">${nameBtn(p)}<span class="bet">${esc(p.side)} ${f1(p.line)} ${esc(stat(p.stat))}</span></div>
-    <div class="r2">Proj ${f2(p.proj)} · ${mins(p.min)} · gap ${f1(p.gap)}% · <span class="wr">win ${f1(p.win)}%</span> · ${esc(p.band)}${p.inj ? ` · 🚑 ${esc(p.inj)}` : ''}</div>
+    <div class="r2">${tipSpan(p)}Proj ${f2(p.proj)} · ${mins(p.min)} · gap ${f1(p.gap)}% · <span class="wr">win ${f1(p.win)}%</span> · ${esc(p.band)}${p.inj ? ` · 🚑 ${esc(p.inj)}` : ''}</div>
   </div></div>`;
 }
 
@@ -510,7 +627,8 @@ function checkPanel(R) {
   for (const e of R.checklist) {
     if (e.player !== prev) {
       if (prev !== null) h += '</div>';
-      h += `<div class="grp"><div class="r1">${nameBtn(e)}</div>`;
+      const tip = tipText(e);
+      h += `<div class="grp"><div class="r1">${nameBtn(e)}${tip ? `<span class="tip small">${esc(tip)}</span>` : ''}</div>`;
       prev = e.player;
     }
     h += `<div class="pl${e.win >= hi ? ' hi' : ''}"><span class="ix">${esc(e.tag)}</span><div class="pb">
@@ -527,7 +645,7 @@ function promosPanel(R) {
   return '<div class="muted small">Over-only Pick6 lines below the player\'s regular line, ranked by gap. Tap a name to copy it.</div>'
     + R.promos.map((p, i) => `<div class="pl"><span class="ix">${i + 1}</span><div class="pb">
         <div class="r1">${nameBtn(p)}<span class="bet">${esc(p.side)} ${f1(p.line)} ${esc(stat(p.stat))}</span></div>
-        <div class="r2">Proj ${f2(p.proj)} · gap ${f1(p.gap)}%${p.inj ? ` · 🚑 ${esc(p.inj)}` : ''}</div>
+        <div class="r2">${tipSpan(p)}Proj ${f2(p.proj)} · gap ${f1(p.gap)}%${p.inj ? ` · 🚑 ${esc(p.inj)}` : ''}</div>
       </div></div>`).join('');
 }
 
@@ -545,8 +663,26 @@ function renderPlays() {
   const stale = R.key !== inputsKey();
   $('stale').hidden = !stale;
   $('stale').textContent = '🔄 The SaberSim file or lines changed since this run. Run again.';
+  renderFresh();
+
+  // Started games: toggle (on by default) and what was left out or kept
+  const n = slateKeys(R).length, names = S.started.map(k => S.games?.get(k)?.label || k.replace('|', '/')).join(', ');
+  $('togrow').hidden = !S.started.length;
+  $('hide').checked = S.hideStarted;
+  $('toglab').textContent = `Leave out started games (${S.started.length} of ${n})`;
+  const cap = !S.games ? "Tip times unavailable (couldn't reach ESPN)."
+    : !S.started.length ? ''
+    : S.hideStarted ? `Left out: ${names}. The tabs are rebuilt from the games that haven't tipped.`
+    : `Started games included: ${names} (🔒 on their plays).`;
+  $('startcap').hidden = !cap;
+  $('startcap').textContent = cap;
+  const allStarted = S.hideStarted && S.started.length > 0 && S.started.length >= n;
+  $('allstarted').hidden = !allStarted;
+  document.querySelector('.tabs').hidden = $('panel').hidden = allStarted;
+
+  const P = { ...R, ...(S.view || {}) };   // the run's constants + the rows shown
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === S.tab)));
-  $('panel').innerHTML = S.tab === 'check' ? checkPanel(R) : S.tab === 'promos' ? promosPanel(R) : lineupsPanel(R);
+  $('panel').innerHTML = S.tab === 'check' ? checkPanel(P) : S.tab === 'promos' ? promosPanel(P) : lineupsPanel(P);
 }
 
 // --- Actions ---
@@ -591,7 +727,7 @@ async function runEngine() {
   try {
     const r = await call('run', { inputs: { sabersim: S.ss, lines: S.lines.files, lines_at: S.lines.at } });
     S.logs.run = r.log + (r.fp ? `\n\nfingerprints ${JSON.stringify(r.fp)}` : '');
-    if (r.ok) S.result = { ...r, at: Date.now(), key };
+    if (r.ok) Object.assign(S, { result: { ...r, at: Date.now(), key }, view: null, started: [], hideStarted: true });
     else S.note = { cls: 'bad', text: `The engine found no plays. ${r.error}` };
   } catch (e) {
     S.note = { cls: 'bad', text: 'The run failed (see Output).' };
@@ -600,6 +736,7 @@ async function runEngine() {
   S.busy = null;
   render();
   renderPlays();
+  await applyStarted();   // tip times from ESPN, started games left out
 }
 
 $('fetchrun').addEventListener('click', async () => { if (await doFetch()) await runEngine(); });
@@ -707,7 +844,14 @@ render();
 call('boot').then(info => { S.py = 'ready'; S.pyInfo = info; render(); })
             .catch(e => { S.py = 'error'; S.pyErr = e.message; render(); });
 loadEngine();
-setInterval(() => { if (!S.busy) render(); }, 60000);   // keep the ages current (not the plays: a copy may be showing)
+$('hide').addEventListener('change', e => { S.hideStarted = e.target.checked; rebuildView(); });
+// Every minute: ages, next tip and warnings stay current. The tabs don't change under
+// you (a name copy may be showing); a warning says when more games have tipped.
+setInterval(() => {
+  if (S.busy) return;
+  render();
+  if (S.result) loadGames(S.result.dates).then(renderFresh);
+}, 60000);
 </script>
 </body>
 </html>

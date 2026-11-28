@@ -155,7 +155,9 @@ def run(inputs_json):
         'platforms': sorted({os.path.basename(f).split('_')[2] for f in files}),
         'dates': sorted(str(d) for d in res['Date'].dropna().unique()),
         'games': int(res['Game'].nunique()),
-        'teams': sorted({str(t) for t in res['Team'].dropna()} | {str(t) for t in res['Opp'].dropna()}),
+        # each game's two team codes, for matching ESPN's scoreboard (tip times, started games)
+        'matchups': sorted({tuple(sorted((str(t), str(o))))
+                            for t, o in zip(res['Team'], res['Opp']) if pd.notna(t) and pd.notna(o)}),
         'const': {'hi': PE_NBA.REC_HIGHLIGHT_WIN_RATE, 'per_game': PE_NBA.LINEUP_MAX_PER_GAME,
                   'slip': PE_NBA.SLIP_SIZE, 'warning': PE_NBA.REC_SAMPLE_WARNING},
     }
