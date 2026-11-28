@@ -13,8 +13,13 @@ const booting = (async () => {
   py = await loadPyodide();
   const t1 = performance.now();
   await py.loadPackage(['pandas', 'requests', 'tzdata']);   // tzdata: ZoneInfo has no system zones here
+  const app = await fetch('app.py?v=1', { cache: 'no-store' });
+  if (!app.ok) throw new Error(`app.py: ${app.status}`);
+  py.FS.mkdirTree(`${HOME}/app`);
+  py.FS.writeFile(`${HOME}/app/app.py`, await app.text());
   const v = JSON.parse(py.runPython(`
 import json, platform, sys
+sys.path.insert(0, '${HOME}/app')
 import pandas, numpy, requests
 from zoneinfo import ZoneInfo
 ZoneInfo('America/New_York')          # fetch_lines_nba.py needs the time zone data
@@ -45,6 +50,19 @@ for _m in _mods:
     else:
         importlib.import_module(_m)
 json.dumps(list(_mods))`));
+  },
+
+  // Run fetch_lines_nba.py. requests makes synchronous calls here, which only a
+  // worker allows. The key is written to a file for the run and removed after.
+  async fetch({ key, base }) {
+    await booting;
+    py.globals.set('_key', key);
+    py.globals.set('_base', base || '');
+    try {
+      return JSON.parse(py.runPython('import app\napp.fetch(_key, _base)'));
+    } finally {
+      py.runPython("globals().pop('_key', None)");
+    }
   },
 };
 

@@ -127,6 +127,20 @@ pre { font: 0.72rem/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anyw
     <details id="edetail" hidden><summary>Error details</summary><pre id="elog"></pre></details>
     <div class="row"><button class="secondary" id="reload">Reload engine</button></div>
   </section>
+
+  <section class="card" aria-labelledby="lines-h">
+    <h2 id="lines-h">Lines</h2>
+    <button id="fetch" disabled>Fetch lines</button>
+    <div id="fetch-hint" class="muted small"></div>
+    <div id="fnote" class="notice" hidden></div>
+    <table id="ltable" aria-live="polite"></table>
+    <div id="linfo" class="muted small" hidden></div>
+    <div class="row" id="lcopy" hidden>
+      <button class="secondary" id="copy">Copy report</button>
+      <span id="copied" class="muted small"></span>
+    </div>
+    <details id="fdetail" hidden><summary>Fetch output</summary><pre id="flog"></pre></details>
+  </section>
 </main>
 
 <script>
@@ -135,7 +149,10 @@ const ENGINE_FILES = ['PE_NBA.py', 'fetch_lines_nba.py'];
 // Local test on the Mac (python http.server on 127.0.0.1): the engine comes from
 // _dev/ next to this page instead of GitHub. _dev/ never goes in this repo.
 const DEV = ['127.0.0.1', 'localhost'].includes(location.hostname);
-const K = { token: 'nba_gh_token', odds: 'ht_key', cache: 'nba_engine_cache' };
+// Local test: fetch from the mock Odds API the test server serves, unless ?real.
+const ODDS_BASE = DEV && !new URLSearchParams(location.search).has('real')
+  ? `${location.origin}/mock/v4/sports/basketball_nba` : '';
+const K = { token: 'nba_gh_token', odds: 'ht_key', cache: 'nba_engine_cache', lines: 'nba_lines' };
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -148,7 +165,7 @@ const store = {
 };
 
 // --- Python worker ---
-const worker = new Worker('py-worker.js?v=2');
+const worker = new Worker('py-worker.js?v=3');
 let seq = 0;
 const pending = new Map();
 worker.onmessage = ({ data }) => {
@@ -172,7 +189,10 @@ const S = {
   py: 'loading', pyInfo: null, pyErr: '',
   loading: false, files: null, source: null, loadErr: null,  // engine files
   imported: null, importErr: '',                              // null | 'ok' | 'error'
+  fetching: false, lines: null, linesSaved: true,             // lines: last fetch with CSVs
+  fetchNote: null, fetchLog: '',
 };
+try { S.lines = JSON.parse(store.get(K.lines) || 'null'); } catch (e) {}
 
 function header(text, key) {
   const m = text.match(new RegExp(`^# ${key}:\\s*(\\S+)`, 'm'));
@@ -301,7 +321,79 @@ function render() {
   $('edetail').hidden = !detail;
   $('elog').textContent = detail;
   $('reload').disabled = S.loading || !tokenOk;
+  renderLines(odds);
 }
+
+function renderLines(odds) {
+  const engineOk = S.py === 'ready' && S.imported === 'ok';
+  $('fetch').disabled = S.fetching || !engineOk || !(odds || DEV);
+  $('fetch').textContent = S.fetching ? 'Fetching…' : S.lines ? 'Fetch new lines' : 'Fetch lines';
+  $('fetch-hint').textContent = S.fetching ? 'Getting every game\'s props from the Odds API. Usually 10–30 s.'
+    : !(odds || DEV) ? 'Add the Odds API key in Setup first.'
+    : !engineOk ? 'Waits for the engine.'
+    : `Uses Odds API credits: about 130 on a 10-game slate.${ODDS_BASE ? ' (Local test: mock Odds API.)' : ''}`;
+
+  const n = S.fetchNote;
+  $('fnote').hidden = !n;
+  if (n) { $('fnote').className = 'notice ' + (n.cls || ''); $('fnote').textContent = n.text; }
+
+  const L = S.lines;
+  $('ltable').innerHTML = L ? L.summary.map(s =>
+    `<tr><td class="mark">✅</td><td>${esc(s.platform)}</td><td class="val">${s.rows.toLocaleString()} props</td></tr>`).join('') : '';
+  $('linfo').hidden = $('lcopy').hidden = !L;
+  if (L) {
+    const bits = [L.slate ? `Slate ${L.slate}` : '', L.games ? `${L.games} games` : '', `fetched ${when(L.at)}`,
+                  L.remaining ? `${Number(L.remaining).toLocaleString()} credits left` : ''];
+    $('linfo').textContent = bits.filter(Boolean).join(' · ') +
+      (S.linesSaved ? '' : '. Not saved on this phone (storage full?): reloading the page loses them.');
+  }
+  $('fdetail').hidden = !S.fetchLog;
+  $('flog').textContent = S.fetchLog;
+}
+
+function report() {
+  const L = S.lines;
+  return [
+    `NBA phone fetch, ${new Date(L.at).toLocaleString()}`,
+    `Slate ${L.slate}, ${L.games} games, ${L.secs} s, credits left ${L.remaining}`,
+    ...L.summary.map(s => `${s.platform}: ${s.rows} rows, fp ${s.fp}`),
+    `Files: ${L.summary.map(s => s.name).join(', ')}`,
+    navigator.userAgent,
+  ].join('\n');
+}
+
+// --- Fetch ---
+$('fetch').addEventListener('click', async () => {
+  const key = store.get(K.odds) || (DEV ? 'local-test' : '');
+  if (!key || S.fetching) return;
+  Object.assign(S, { fetching: true, fetchNote: null, fetchLog: '' });
+  render();
+  try {
+    const r = await call('fetch', { key, base: ODDS_BASE });
+    S.fetchLog = r.log;
+    const problems = r.log.split('\n').map(l => l.trim()).filter(l => /^(❌|⚠️)/.test(l));
+    if (r.summary.length) {
+      S.lines = { at: Date.now(), files: r.files, summary: r.summary, remaining: r.remaining,
+                  games: r.games, slate: r.slate, secs: r.secs };
+      S.linesSaved = store.set(K.lines, JSON.stringify(S.lines));
+      const failed = problems.filter(l => /Error fetching/.test(l));
+      if (failed.length) S.fetchNote = { text: `${failed.length} game(s) failed (see Fetch output); the rest are in.` };
+    } else {
+      S.fetchNote = { cls: r.code ? 'bad' : '', text: problems.join(' ') || 'The fetch returned no lines (see Fetch output).' };
+    }
+  } catch (e) {
+    S.fetchNote = { cls: 'bad', text: 'The fetch failed (see Fetch output).' };
+    S.fetchLog = e.message;
+  }
+  S.fetching = false;
+  render();
+});
+
+$('copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(report()); $('copied').textContent = 'Copied ✓'; }
+  catch (e) { $('copied').textContent = 'Copy failed.'; }
+  setTimeout(() => { $('copied').textContent = ''; }, 2000);
+});
 
 // --- Setup actions ---
 $('token-save').addEventListener('click', () => {
