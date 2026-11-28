@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PropEdge NBA">
+<meta name="robots" content="noindex">
+<title>PropEdge NBA</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* NBA plays on the phone: the real PE_NBA.py and fetch_lines_nba.py, loaded at run
+   time from the private propedge repo with a read-only token saved on this phone,
+   run by Pyodide in py-worker.js. Same look as halftime/index.html. */
+:root {
+  --bg: #f3f5f7; --card: #ffffff; --fg: #17202a; --muted: #5c6875; --line: #d9dfe5; --accent: #1f5fbf;
+  --ok: #1d7a46; --ok-bg: #e3f3ea; --warn: #7a5b00; --warn-bg: #fbf1d4; --bad: #b3261e; --bad-bg: #fbe7e5;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #0f1419; --card: #182029; --fg: #e6ebf0; --muted: #93a1af; --line: #2a3540; --accent: #6ea2f0;
+  --ok: #6fd39a; --ok-bg: #173325; --warn: #e8c766; --warn-bg: #352c12; --bad: #f2948c; --bad-bg: #3a1c1a; color-scheme: dark } }
+html { background: var(--bg); padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--sans);
+  padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); padding-block: 16px 60px; }
+main { max-width: 620px; margin: 0 auto; display: grid; gap: 12px; }
+h1 { font-size: 1.3rem; margin: 0; }
+h2 { font-size: 1rem; margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 0.82rem; }
+[hidden] { display: none !important; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
+.inner { display: grid; gap: 14px; margin-top: 10px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.lab { font-weight: 600; font-size: 0.9rem; }
+button { font: 600 0.95rem var(--sans); background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 8px 12px; }
+button:disabled { opacity: 0.5; cursor: default; }
+button:focus-visible, summary:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 16px keeps iOS from zooming in on the field */
+input.key { font: 16px var(--mono); padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg); color: var(--fg); flex: 1 1 180px; min-width: 0; }
+.notice { padding: 8px 10px; border-radius: 8px; font-size: 0.88rem; background: var(--warn-bg); color: var(--warn); }
+.notice.ok { background: var(--ok-bg); color: var(--ok); }
+.notice.bad { background: var(--bad-bg); color: var(--bad); }
+.pill { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.88rem; background: var(--ok-bg); color: var(--ok); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+td { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: top; }
+tr:first-child td { border-top: 0; }
+td.mark { width: 1.6em; text-align: center; }
+td.what { font: 0.82rem var(--mono); white-space: nowrap; }
+td.val { overflow-wrap: anywhere; }
+details summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+details.help summary { font-weight: 400; color: var(--accent); }
+ol { margin: 6px 0 0; padding-left: 1.3em; font-size: 0.88rem; }
+li { margin: 3px 0; }
+pre { font: 0.72rem/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto;
+  background: var(--bg); border-radius: 8px; padding: 8px; margin: 8px 0 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>NBA plays</h1>
+    <div class="muted small">Runs PE_NBA.py on this phone. Nothing here is logged or graded; Mac runs are the graded ones.</div>
+  </header>
+
+  <section class="card">
+    <details id="setup" open>
+      <summary id="setup-sum">Setup</summary>
+      <div class="inner">
+        <div class="field">
+          <span class="lab" id="token-lab">GitHub token</span>
+          <div id="token-saved" class="row" hidden>
+            <span class="pill">✅ Saved on this phone</span>
+            <button class="secondary" id="token-change">Change</button>
+            <button class="secondary" id="token-remove">Remove</button>
+          </div>
+          <div id="token-entry" class="row">
+            <input class="key" id="token" type="password" aria-labelledby="token-lab" placeholder="github_pat_…"
+                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+            <button id="token-save">Save</button>
+          </div>
+          <div id="token-msg" class="notice bad" hidden></div>
+          <div class="muted small">Lets this page read the private propedge repo, so it always runs the current engine. It can't change anything.</div>
+          <details class="help">
+            <summary>Make a new token</summary>
+            <ol>
+              <li>On github.com: your picture › Settings › Developer settings › Personal access tokens › Fine-grained tokens › Generate new token.</li>
+              <li>Name: <b>PropEdge phone</b>. Expiration: a year out.</li>
+              <li>Repository access: Only select repositories › <b>propedge</b>.</li>
+              <li>Permissions: <b>Contents › Read-only</b>. Nothing else (Metadata read-only gets added by itself).</li>
+              <li>Generate token and copy it. GitHub shows it only once: save it in 1Password, then paste it here.</li>
+            </ol>
+          </details>
+        </div>
+        <div class="field">
+          <span class="lab" id="odds-lab">Odds API key</span>
+          <div id="odds-saved" class="row" hidden>
+            <span class="pill">✅ Saved on this phone</span>
+            <span class="muted small">shared with the halftime page</span>
+          </div>
+          <div id="odds-entry" class="row">
+            <input class="key" id="odds" type="password" aria-labelledby="odds-lab" placeholder="Odds API key"
+                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+            <button id="odds-save">Save</button>
+          </div>
+          <div id="odds-help" class="muted small">Not found on this phone. If the halftime page has it, open this page the same way you open that one (both from Safari, or both from the PropEdge home screen icon). Otherwise paste it here once; the halftime page will see it too.</div>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section class="card" aria-labelledby="eng-h">
+    <h2 id="eng-h">Engine</h2>
+    <table id="etable" aria-live="polite"></table>
+    <div id="enote" class="notice" hidden></div>
+    <details id="edetail" hidden><summary>Error details</summary><pre id="elog"></pre></details>
+    <div class="row"><button class="secondary" id="reload">Reload engine</button></div>
+  </section>
+</main>
+
+<script>
+const REPO = 'gaudette-png/propedge';
+const ENGINE_FILES = ['PE_NBA.py', 'fetch_lines_nba.py'];
+// Local test on the Mac (python http.server on 127.0.0.1): the engine comes from
+// _dev/ next to this page instead of GitHub. _dev/ never goes in this repo.
+const DEV = ['127.0.0.1', 'localhost'].includes(location.hostname);
+const K = { token: 'nba_gh_token', odds: 'ht_key', cache: 'nba_engine_cache' };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const secs = ms => (ms / 1000).toFixed(1) + ' s';
+const when = t => new Date(t).toLocaleString([], { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+};
+
+// --- Python worker ---
+const worker = new Worker('py-worker.js?v=2');
+let seq = 0;
+const pending = new Map();
+worker.onmessage = ({ data }) => {
+  const p = pending.get(data.id);
+  if (!p) return;
+  pending.delete(data.id);
+  data.ok ? p.resolve(data.result) : p.reject(new Error(data.error));
+};
+worker.onerror = e => {
+  for (const p of pending.values()) p.reject(new Error(e.message || 'Python could not start'));
+  pending.clear();
+};
+const call = (cmd, args = {}) => new Promise((resolve, reject) => {
+  const id = ++seq;
+  pending.set(id, { resolve, reject });
+  worker.postMessage({ id, cmd, ...args });
+});
+
+// --- State ---
+const S = {
+  py: 'loading', pyInfo: null, pyErr: '',
+  loading: false, files: null, source: null, loadErr: null,  // engine files
+  imported: null, importErr: '',                              // null | 'ok' | 'error'
+};
+
+function header(text, key) {
+  const m = text.match(new RegExp(`^# ${key}:\\s*(\\S+)`, 'm'));
+  return m ? m[1] : '';
+}
+
+// --- Engine files: GitHub, or the copy saved on this phone ---
+class LoadError extends Error {}
+
+async function fromGitHub(token) {
+  const get = async name => {
+    let r;
+    try {
+      r = await fetch(`https://api.github.com/repos/${REPO}/contents/${name}?ref=main`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.raw+json',
+                   'X-GitHub-Api-Version': '2022-11-28' },
+        cache: 'no-store',
+      });
+    } catch (e) {
+      throw new LoadError("Couldn't reach GitHub (no connection?).");
+    }
+    if (r.status === 401) throw new LoadError("GitHub didn't accept the token. It may be mistyped or expired: make a new one (Setup › Make a new token) and save it.");
+    if (r.status === 403) throw new LoadError("The token isn't allowed to read the repo's files. Make a new one with Contents set to Read-only.");
+    if (r.status === 404) throw new LoadError(`The token can't see ${name} in the propedge repo. Make a new one with propedge under Repository access.`);
+    if (!r.ok) throw new LoadError(`GitHub answered ${r.status} for ${name}.`);
+    return r.text();
+  };
+  const texts = await Promise.all(ENGINE_FILES.map(get));
+  return Object.fromEntries(ENGINE_FILES.map((n, i) => [n, texts[i]]));
+}
+
+async function fromDev() {
+  const texts = await Promise.all(ENGINE_FILES.map(async n => {
+    const r = await fetch(`_dev/${n}`, { cache: 'no-store' });
+    if (!r.ok) throw new LoadError(`_dev/${n}: ${r.status}`);
+    return r.text();
+  }));
+  return Object.fromEntries(ENGINE_FILES.map((n, i) => [n, texts[i]]));
+}
+
+function savedCopy() {
+  try {
+    const c = JSON.parse(store.get(K.cache) || 'null');
+    return c && ENGINE_FILES.every(n => typeof c.files?.[n] === 'string') ? c : null;
+  } catch (e) { return null; }
+}
+
+async function loadEngine() {
+  if (S.loading) return;
+  const token = store.get(K.token);
+  Object.assign(S, { loading: true, loadErr: null, imported: null, importErr: '' });
+  if (!DEV && !token) {
+    Object.assign(S, { loading: false, files: null, source: null });
+    render();
+    return;
+  }
+  render();
+  try {
+    const files = DEV ? await fromDev() : await fromGitHub(token);
+    const at = Date.now();
+    Object.assign(S, { files, source: { kind: DEV ? 'dev' : 'github', at } });
+    if (!DEV) store.set(K.cache, JSON.stringify({ files, at }));
+  } catch (e) {
+    S.loadErr = e instanceof LoadError ? e.message : String(e.message || e);
+    const c = savedCopy();
+    Object.assign(S, c ? { files: c.files, source: { kind: 'saved', at: c.at } } : { files: null, source: null });
+  }
+  S.loading = false;
+  render();
+  if (S.files) {
+    try { await call('engine', { files: S.files }); S.imported = 'ok'; }
+    catch (e) { S.imported = 'error'; S.importErr = e.message; }
+    render();
+  }
+}
+
+// --- Render ---
+function render() {
+  // Setup
+  const token = store.get(K.token), odds = store.get(K.odds);
+  $('token-saved').hidden = !token;
+  $('token-entry').hidden = !!token;
+  $('odds-saved').hidden = !odds;
+  $('odds-entry').hidden = $('odds-help').hidden = !!odds;
+  const tokenOk = DEV || !!token;
+  $('setup-sum').textContent = `Setup · ${tokenOk ? '✅' : '◻️'} GitHub token · ${odds ? '✅' : '◻️'} Odds API key`;
+
+  // Engine table
+  const rows = [];
+  const py = S.py === 'ready'
+    ? ['✅', `Ready in ${secs(S.pyInfo.t_python + S.pyInfo.t_packages)} · Python ${S.pyInfo.python}, pandas ${S.pyInfo.pandas}`]
+    : S.py === 'error' ? ['❌', "Didn't start (see Error details)"] : ['⏳', 'Starting…'];
+  rows.push([py[0], 'Python', py[1]]);
+  for (const n of ENGINE_FILES) {
+    let mark, val;
+    if (S.loading) { mark = '⏳'; val = DEV ? 'Loading from this Mac…' : 'Loading from GitHub…'; }
+    else if (!S.files) { mark = tokenOk ? '❌' : '◻️'; val = tokenOk ? 'Not loaded' : 'Needs the GitHub token (Setup)'; }
+    else {
+      const v = header(S.files[n], 'Version'), d = header(S.files[n], 'Last Updated');
+      val = `v${v || '?'}${d ? ` · updated ${d}` : ''}`;
+      mark = S.imported === 'ok' ? '✅' : S.imported === 'error' ? '❌' : '⏳';
+      if (S.imported === null) val += ' · checking…';
+    }
+    rows.push([mark, n, val]);
+  }
+  if (S.source) {
+    const src = S.source.kind === 'dev' ? 'This Mac (local test)'
+      : S.source.kind === 'github' ? `GitHub, ${when(S.source.at)}`
+      : `Saved copy from ${when(S.source.at)}`;
+    rows.push([S.source.kind === 'saved' ? '⚠️' : '·', 'From', src]);
+  }
+  $('etable').innerHTML = rows.map(([m, w, v]) =>
+    `<tr><td class="mark">${m}</td><td class="what">${esc(w)}</td><td class="val">${esc(v)}</td></tr>`).join('');
+
+  // Notice under the table
+  let note = '', cls = 'notice';
+  if (S.loadErr && S.files) note = `${S.loadErr} Using the copy saved on this phone from ${when(S.source.at)} instead.`;
+  else if (S.loadErr) { note = S.loadErr; cls += ' bad'; }
+  else if (S.py === 'error') { note = 'Python didn\'t start. Check the connection and reload the page.'; cls += ' bad'; }
+  else if (S.imported === 'error') { note = 'The engine loaded but Python couldn\'t import it.'; cls += ' bad'; }
+  else if (S.imported === 'ok' && S.py === 'ready') { note = 'Engine ready.'; cls += ' ok'; }
+  $('enote').hidden = !note;
+  $('enote').className = cls;
+  $('enote').textContent = note;
+  const detail = S.pyErr || S.importErr;   // a failed start also fails the import: show it once
+  $('edetail').hidden = !detail;
+  $('elog').textContent = detail;
+  $('reload').disabled = S.loading || !tokenOk;
+}
+
+// --- Setup actions ---
+$('token-save').addEventListener('click', () => {
+  const v = $('token').value.trim();
+  $('token-msg').hidden = true;
+  if (!/^(github_pat_|ghp_)\w+$/.test(v)) {
+    $('token-msg').textContent = "That doesn't look like a GitHub token. They start with github_pat_.";
+    $('token-msg').hidden = false;
+    return;
+  }
+  if (!store.set(K.token, v)) {
+    $('token-msg').textContent = 'This browser is blocking storage, so the token can\'t be saved (Private Browsing?).';
+    $('token-msg').hidden = false;
+    return;
+  }
+  $('token').value = '';
+  render();
+  loadEngine();
+});
+$('token-change').addEventListener('click', () => {
+  $('token-saved').hidden = true;
+  $('token-entry').hidden = false;
+  $('token').focus();
+});
+$('token-remove').addEventListener('click', () => {
+  if (!confirm('Remove the GitHub token from this phone? The page keeps its saved copy of the engine.')) return;
+  store.del(K.token);
+  render();
+});
+$('odds-save').addEventListener('click', () => {
+  const v = $('odds').value.trim();
+  if (!v) return;
+  store.set(K.odds, v);
+  $('odds').value = '';
+  render();
+});
+$('reload').addEventListener('click', loadEngine);
+
+// --- Start ---
+if (store.get(K.token) || DEV) $('setup').open = !store.get(K.odds);
+render();
+call('boot').then(info => { S.py = 'ready'; S.pyInfo = info; render(); })
+            .catch(e => { S.py = 'error'; S.pyErr = e.message; render(); });
+loadEngine();
+</script>
+</body>
+</html>
