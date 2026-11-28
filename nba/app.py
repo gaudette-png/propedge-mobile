@@ -5,9 +5,11 @@ Calls the real fetch_lines_nba.py and PE_NBA.py that the page loaded from the
 private repo (no engine code lives in this public repo) and hands plain JSON
 back to the page.
 
-The Mac can run the same summary on its own CSVs, so a phone fetch can be
-checked against a Mac fetch made at the same time:
+On the Mac, two read-only commands give the same fingerprints the phone shows, to
+check a phone fetch or run against a Mac one on the same files:
     python3 app.py summary ~/Downloads/OddsAPI_NBA_*_<date>_<time>.csv
+    python3 app.py fp ~/Desktop/PropEdge ~/Desktop/PropEdge/NBA_Edge_*_<date>_<time>.csv
+fetch() and run() refuse to run outside the browser (they clear ~/Downloads).
 """
 import contextlib
 import glob
@@ -37,8 +39,16 @@ def summarize(paths):
     return out
 
 
+def _browser_only():
+    # fetch() and run() empty ~/Downloads first. In the browser that's Pyodide's own
+    # throwaway file system; on a Mac it would be the real Downloads folder.
+    if sys.platform != 'emscripten':
+        raise RuntimeError('app.fetch() / app.run() only run in the browser: they clear ~/Downloads.')
+
+
 def fetch(key, base_url=''):
     """Run fetch_lines_nba.py as on the Mac; return its CSVs, summary and output."""
+    _browser_only()
     import fetch_lines_nba as F
     for p in glob.glob(os.path.join(DOWNLOADS, 'OddsAPI_NBA_*.csv')):
         os.remove(p)
@@ -112,6 +122,7 @@ def run(inputs_json):
     NBA_Edge CSVs, and they're read back the way pe_nba_web.py reads them.
     inputs: {'sabersim': [{name, at (ms), text}], 'lines': {name: text}, 'lines_at': ms}
     """
+    _browser_only()
     import importlib
     import pandas as pd
     import PE_NBA
@@ -217,7 +228,8 @@ def views(started_json='[]'):
 
 
 def _fingerprints(res, by_platform, leftovers, checklist):
-    """Same fingerprints as nba-test/harness.py, so a phone run can be checked against the Mac."""
+    """Short hashes of the plays, lineups, leftovers and check list, so a phone run can be
+    checked against a Mac run (`python3 app.py fp …`)."""
     import pandas as pd
 
     def fp(text):
@@ -244,8 +256,23 @@ def _fingerprints(res, by_platform, leftovers, checklist):
     return {'plays': fp(plays), 'lineups': fp(lineups), 'leftovers': fp(left), 'checklist': fp(check)}
 
 
+def fp_from_csvs(engine_dir, paths):
+    """Fingerprints of a finished Mac run's NBA_Edge CSVs (read-only), to compare with the
+    'fingerprints' line at the end of the phone's run output."""
+    import pandas as pd
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, engine_dir)
+    import PE_NBA
+    res = pd.concat([pd.read_csv(p) for p in sorted(paths)], ignore_index=True)
+    res['Inj Flag'] = res['Inj Flag'].fillna('')
+    _, by_platform, leftovers = PE_NBA.recommended_lineups(res)
+    return _fingerprints(res, by_platform, leftovers, PE_NBA.pick6_checklist_rows(res))
+
+
 if __name__ == '__main__':
     if sys.argv[1:2] == ['summary']:
         print(json.dumps(summarize(sys.argv[2:]), indent=1))
+    elif sys.argv[1:2] == ['fp'] and len(sys.argv) > 3:
+        print(json.dumps(fp_from_csvs(sys.argv[2], sys.argv[3:])))
     else:
         print(__doc__)

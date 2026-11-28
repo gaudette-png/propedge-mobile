@@ -260,7 +260,7 @@ const store = {
 const load = (k, d) => { try { return JSON.parse(store.get(k) || 'null') ?? d; } catch (e) { return d; } };
 
 // --- Python worker ---
-const worker = new Worker('py-worker.js?v=5');
+const worker = new Worker('py-worker.js?v=6');
 let seq = 0;
 const pending = new Map();
 worker.onmessage = ({ data }) => {
