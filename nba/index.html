@@ -54,6 +54,8 @@ td.what { font: 0.82rem var(--mono); white-space: nowrap; }
 td.val { overflow-wrap: anywhere; }
 details summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
 details.help summary { font-weight: 400; color: var(--accent); }
+a.btnlink { display: inline-block; margin-top: 8px; font: 600 0.95rem var(--sans); color: var(--accent); text-decoration: none;
+  border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; }
 ol { margin: 6px 0 0; padding-left: 1.3em; font-size: 0.88rem; }
 li { margin: 3px 0; }
 pre { font: 0.72rem/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto;
@@ -86,14 +88,18 @@ pre { font: 0.72rem/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anyw
           </div>
           <div id="token-msg" class="notice bad" hidden></div>
           <div class="muted small">Lets this page read the private propedge repo, so it always runs the current engine. It can't change anything.</div>
-          <details class="help">
+          <details class="help" id="token-help">
             <summary>Make a new token</summary>
+            <!-- GitHub pre-fills name, description, expiry (days) and permissions from the URL;
+                 the repository can't be pre-filled. -->
+            <a class="btnlink" target="_blank" rel="noopener"
+               href="https://github.com/settings/personal-access-tokens/new?name=PropEdge+phone&amp;description=Reads+the+engine+for+the+NBA+phone+page&amp;expires_in=366&amp;contents=read">Open GitHub's token page ↗</a>
             <ol>
-              <li>On github.com: your picture › Settings › Developer settings › Personal access tokens › Fine-grained tokens › Generate new token.</li>
-              <li>Name: <b>PropEdge phone</b>. Expiration: a year out.</li>
-              <li>Repository access: Only select repositories › <b>propedge</b>.</li>
-              <li>Permissions: <b>Contents › Read-only</b>. Nothing else (Metadata read-only gets added by itself).</li>
-              <li>Generate token and copy it. GitHub shows it only once: save it in 1Password, then paste it here.</li>
+              <li>Sign in to GitHub if it asks. The page opens with the name, a one-year expiry and Contents: Read-only already filled in.</li>
+              <li>Repository access: tap <b>Only select repositories</b> and pick <b>propedge</b>. That's the one thing to choose.</li>
+              <li>Permissions should list just Contents and Metadata, both Read-only.</li>
+              <li>Tap <b>Generate token</b>, then copy the token (it starts with github_pat_). GitHub shows it only once: save it in 1Password too.</li>
+              <li>Come back to this page and paste it in the GitHub token box.</li>
             </ol>
           </details>
         </div>
@@ -336,6 +342,7 @@ $('reload').addEventListener('click', loadEngine);
 
 // --- Start ---
 if (store.get(K.token) || DEV) $('setup').open = !store.get(K.odds);
+$('token-help').open = !store.get(K.token);   // no token yet: show how to get one
 render();
 call('boot').then(info => { S.py = 'ready'; S.pyInfo = info; render(); })
             .catch(e => { S.py = 'error'; S.pyErr = e.message; render(); });
